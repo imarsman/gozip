@@ -1,0 +1,16 @@
+github.com/alexflint/go-scalar v1.1.0 h1:aaAouLLzI9TChcPXotr6gUhq+Scr8rl0P9P4PnltbhM=
+github.com/alexflint/go-scalar v1.1.0/go.mod h1:LoFvNMqS1CPrMVltza4LvnGKhaSpc3oyLEBUZVhhS2o=
+github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
+github.com/jwalton/gchalk v1.1.0 h1:S1yNzYrPgdpP0wmWw75X6EK3SYLDJ/RsdbLUJ5PLhGU=
+github.com/jwalton/gchalk v1.1.0/go.mod h1:kmvsubrIhnHSklat2ZWNj7zlLs3SS2wGNgsBVPtill4=
+github.com/jwalton/go-supportscolor v1.0.0 h1:Do3OE2y/iUibg79+QhkRE6G2evYKEv2bwi6sGs8Nd7s=
+github.com/jwalton/go-supportscolor v1.0.0/go.mod h1:hFVUAZV2cWg+WFFC4v8pT2X/S2qUUBYMioBD9AINXGs=
+github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
+github.com/rickb777/go-arg v0.0.0-20171002133623-ba9514f0be00 h1:1O9WpDK/fQiV5mtPZ9nggccoH+5YeX4ATlyEstRocIE=
+github.com/rickb777/go-arg v0.0.0-20171002133623-ba9514f0be00/go.mod h1:h9ZbWhsGkfsHdohJe+21PmJoTgEoE9IQ3sS6M3Jr1d8=
+github.com/stretchr/testify v1.2.2/go.mod h1:a8OnRcib4nhh0OaRAV+Yts87kKdq0PP7pXfy6kDkUVs=
+golang.org/x/sys v0.0.0-20201119102817-f84b799fce68/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
+golang.org/x/sys v0.0.0-20210220050731-9a76102bfb43 h1:SgQ6LNaYJU0JIuEHv9+s6EbhSCwYeAf5Yvj6lpYlqAE=
+golang.org/x/sys v0.0.0-20210220050731-9a76102bfb43/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
+golang.org/x/term v0.0.0-20210220032956-6a3ed077a48d h1:SZxvLBoTP5yHO3Frd4z4vrF+DBX9vMVanchswa69toE=
+golang.org/x/term v0.0.0-20210220032956-6a3ed077a48d/go.mod h1:bj7SfCRtBDWHUb9snDiAeCFNEtKQo2Wmx5Cou7ajbmo=
