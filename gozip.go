@@ -116,6 +116,8 @@ func walkAllFilesInDir(path string, files *[]string, errorMsgs *[]string) (err e
 		return
 	}
 
+	basePath := path
+
 	return filepath.Walk(path, func(path string, info os.FileInfo, e error) error {
 		if err != nil {
 			*errorMsgs = append(*errorMsgs, e.Error())
@@ -124,8 +126,8 @@ func walkAllFilesInDir(path string, files *[]string, errorMsgs *[]string) (err e
 
 		// check if it is a regular file (not dir)
 		if info.Mode().IsRegular() {
-			path := info.Name()
-			*files = append(*files, path)
+			// start with base path since it is a directory
+			*files = append(*files, filepath.Join(basePath, path))
 		}
 		return nil
 	})
