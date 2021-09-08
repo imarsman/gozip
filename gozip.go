@@ -233,18 +233,21 @@ func archiveFiles(zipFileName string, fileEntries []fileEntry) (err error) {
 }
 
 func main() {
-	arg.MustParse(&args)
+	p := arg.MustParse(&args)
 	fmt.Println(args.File)
 
 	if args.Zipfile == "" {
-		fmt.Fprintln(os.Stderr, colour(brightRed, "no zipfile specified"))
-		os.Exit(1)
+		p.Fail(colour(brightRed, "no zipfile specified"))
 	}
 
 	if args.Unzip {
 		if len(args.SourceFiles) > 0 {
-			fmt.Fprintln(os.Stderr, colour(brightRed, "files specified - invalid with unzip"))
-			os.Exit(1)
+			p.Fail(colour(brightRed, "can't specify source files witn unzip"))
+		}
+	}
+	if !args.Unzip {
+		if len(args.SourceFiles) == 0 {
+			p.Fail(colour(brightRed, "no files to zip specified"))
 		}
 	}
 
@@ -253,13 +256,18 @@ func main() {
 
 	if !args.Unzip {
 		// Populate list of files
-		for _, file := range fileEntries {
-			walkAllFilesInDir(file.path, &fileEntries, &errorMsgs)
+		for _, path := range args.SourceFiles {
+			walkAllFilesInDir(path, &fileEntries, &errorMsgs)
 		}
 		if len(fileEntries) == 0 {
 			fmt.Fprintln(os.Stderr, colour(brightRed, "no valid files found"))
 			os.Exit(1)
 		}
+	}
+
+	// Show what has been found
+	for _, fileEntry := range fileEntries {
+		fmt.Printf("Entry %+v", fileEntry)
 	}
 
 	// Exit for now
