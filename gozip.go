@@ -196,7 +196,7 @@ func printEntries(name string) (err error) {
 		return
 	}
 	fmt.Printf("%0scompressed%3suncompressed%5sdate%-7stime%6sname\n", "", "", "", "", "")
-	fmt.Println(strings.Repeat("-", 70))
+	fmt.Println(strings.Repeat("-", 75))
 
 	var totalCompressed int64 = 0
 	var totalUnCompressed int64 = 0
@@ -207,7 +207,7 @@ func printEntries(name string) (err error) {
 		totalUnCompressed += int64(file.uncompressedSize)
 		count++
 	}
-	fmt.Println(strings.Repeat("-", 70))
+	fmt.Println(strings.Repeat("-", 75))
 	fmt.Printf("%8d%13d%30d\n", totalCompressed, totalUnCompressed, count)
 	return
 }
@@ -268,6 +268,7 @@ func archiveFiles(zipFileName string, fileEntries []fileEntry) (err error) {
 		}
 
 		header, _ := zip.FileInfoHeader(info)
+		header.Method = uint16(compressionLevel)
 		header.Name = fileEntry.archivePath()
 
 		zf, err := zipWriter.CreateHeader(header)
@@ -300,17 +301,21 @@ func archiveFiles(zipFileName string, fileEntries []fileEntry) (err error) {
 */
 
 var args struct {
-	Unzip       bool     `arg:"-U" help:"unzip the archive"`
-	File        string   `arg:"-f" help:"verbosity level"`
-	List        bool     `arg:"l" help:"list entries in zip file"`
-	Recursive   bool     `arg:"-r" help:"recursive"`
-	Update      bool     `arg:"-u" help:"update existing"`
-	Add         bool     `arg:"-a" help:"add if not existing"`
-	Zipfile     string   `arg:"positional"`
-	SourceFiles []string `arg:"positional"`
+	Unzip            bool     `arg:"-U" help:"unzip the archive"`
+	File             string   `arg:"-f" help:"verbosity level"`
+	List             bool     `arg:"l" help:"list entries in zip file"`
+	Recursive        bool     `arg:"-r" help:"recursive"`
+	Update           bool     `arg:"-u" help:"update existing"`
+	Add              bool     `arg:"-a" help:"add if not existing"`
+	CompressionLevel int      `arg:"L" help:"compression level"`
+	Zipfile          string   `arg:"positional"`
+	SourceFiles      []string `arg:"positional"`
 }
 
+var compressionLevel = 8
+
 func main() {
+	args.CompressionLevel = 6
 	p := arg.MustParse(&args)
 	fmt.Println(args.File)
 
@@ -330,6 +335,11 @@ func main() {
 	}
 	if !args.Unzip && !args.List {
 		p.Fail(colour(brightRed, "either unzip or list must be specified"))
+	}
+
+	if args.CompressionLevel < 0 || args.CompressionLevel > 9 {
+		args.CompressionLevel = 8
+		compressionLevel = args.CompressionLevel
 	}
 
 	if args.List {
