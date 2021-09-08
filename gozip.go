@@ -27,6 +27,7 @@ type fileEntry struct {
 	isBareFile bool
 }
 
+// hasEntry check for duplicate absolute paths
 func hasEntry(check fileEntry, feList *[]fileEntry) (found bool) {
 	for _, fe := range *feList {
 		if check.fullPath() == fe.fullPath() {
@@ -36,12 +37,14 @@ func hasEntry(check fileEntry, feList *[]fileEntry) (found bool) {
 	return
 }
 
+// fullPath get full path for an entry
 func (fe *fileEntry) fullPath() (fullPath string) {
 	fullPath = filepath.Join(fe.parentPath, fe.path)
 	// fmt.Printf("%+v\n", fe)
 	return
 }
 
+// archivePath get path for archive for entry
 func (fe *fileEntry) archivePath() (archivePath string) {
 	if fe.isBareFile {
 		archivePath = filepath.Join(fe.parentPath, fe.path)
@@ -58,6 +61,7 @@ func (fe *fileEntry) archivePath() (archivePath string) {
 	return
 }
 
+// colour get colour output
 func colour(colour int, input ...string) (output string) {
 	str := fmt.Sprint(strings.Join(input, " "))
 	str = strings.Replace(str, "  ", " ", -1)
@@ -84,14 +88,6 @@ func colour(colour int, input ...string) (output string) {
 	writing how much of the original utility will be implemented.
 */
 
-func createZip(path string) (zipFile *os.File, err error) {
-	zipFile, err = os.Create(path)
-	if err != nil {
-		return
-	}
-	return
-}
-
 var args struct {
 	Unzip       bool     `arg:"-U" help:"unzip the archive"`
 	File        string   `arg:"-f" help:"verbosity level"`
@@ -100,37 +96,6 @@ var args struct {
 	Add         bool     `arg:"-a" help:"add if not existing"`
 	Zipfile     string   `arg:"positional"`
 	SourceFiles []string `arg:"positional"`
-}
-
-// zip a list of paths to files
-// https://golang.cafe/blog/golang-zip-file-example.html
-func zipFiles(zipFilePath string, paths []string) (err error) {
-	zipFile, err := os.Create(zipFilePath)
-	if err != nil {
-		panic(err)
-	}
-	zipWriter := zip.NewWriter(zipFile)
-	defer zipWriter.Close()
-
-	for _, currentPath := range paths {
-		var file *os.File
-		file, err = os.Open(currentPath)
-		if err != nil {
-			panic(err)
-		}
-		defer file.Close()
-
-		var zw io.Writer
-		zw, err = zipWriter.Create(currentPath)
-		if err != nil {
-			return
-		}
-		if _, err := io.Copy(zw, file); err != nil {
-			panic(err)
-		}
-	}
-
-	return
 }
 
 func walkAllFilesInDir(path string, fileEntries *[]fileEntry, errorMsgs *[]string) (err error) {
@@ -157,10 +122,6 @@ func walkAllFilesInDir(path string, fileEntries *[]fileEntry, errorMsgs *[]strin
 	var basePath string
 
 	if !fileInfo.IsDir() {
-		pth := path
-		if strings.HasPrefix(path, "/") {
-			pth = pth[1:]
-		}
 		fe := fileEntry{}
 		fe.rootPath = rootPath
 
@@ -207,11 +168,13 @@ func walkAllFilesInDir(path string, fileEntries *[]fileEntry, errorMsgs *[]strin
 	})
 }
 
-func getZipfile(path string) (archive *os.File, err error) {
-	_, err = os.Create(path)
-	if err != nil {
-
-	}
+// getFileForWriting get file for new or upened zip file
+func getFileForWriting(path string) (archive *os.File, err error) {
+	// _, err = os.Create(path)
+	// if err != nil {
+	// 	fmt.Fprintln(os.Stderr, colour(brightRed, err.Error()))
+	// 	return
+	// }
 
 	if _, err = os.Stat(path); os.IsNotExist(err) {
 		// Handle new file
@@ -219,12 +182,14 @@ func getZipfile(path string) (archive *os.File, err error) {
 		if err != nil {
 			archive, err = os.OpenFile(path, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
 			if err != nil {
+				fmt.Fprintln(os.Stderr, colour(brightRed, err.Error()))
 				return
 			}
 		}
 	} else {
 		archive, err = os.OpenFile(path, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
 		if err != nil {
+			fmt.Fprintln(os.Stderr, colour(brightRed, err.Error()))
 			return
 		}
 	}
@@ -234,7 +199,7 @@ func getZipfile(path string) (archive *os.File, err error) {
 // archiveFiles make a zip archive and fill with information from list of fileEntries
 func archiveFiles(zipFileName string, fileEntries []fileEntry) (err error) {
 	var archive *os.File
-	archive, err = getZipfile(zipFileName)
+	archive, err = getFileForWriting(zipFileName)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, colour(brightRed, err.Error()))
 		return
@@ -302,36 +267,14 @@ func main() {
 		os.Exit(0)
 	}
 
-	var archive *os.File
-	archive, err := getZipfile(args.Zipfile)
+	var archiveFile *os.File
+	archiveFile, err := getFileForWriting(args.Zipfile)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, colour(brightRed, err.Error()))
 		os.Exit(1)
 	}
 
-	defer archive.Close()
+	defer archiveFile.Close()
 
 	archiveFiles(args.Zipfile, fileEntries)
-
-	// zipWriter := zip.NewWriter(archive)
-	// defer zipWriter.Close()
-
-	// for _, path := range files {
-	// 	file, err := os.Open(path.parentPath)
-	// 	if err != nil {
-	// 		fmt.Fprintln(os.Stderr, colour(brightRed, err.Error()))
-	// 		continue
-	// 	}
-	// 	defer file.Close()
-
-	// 	dest, err := zipWriter.Create(path.parentPath)
-	// 	if err != nil {
-	// 		fmt.Fprintln(os.Stderr, colour(brightRed, err.Error()))
-	// 		continue
-	// 	}
-	// 	if _, err := io.Copy(dest, file); err != nil {
-	// 		fmt.Fprintln(os.Stderr, colour(brightRed, err.Error()))
-	// 		continue
-	// 	}
-	// }
 }
