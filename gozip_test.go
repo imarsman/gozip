@@ -89,6 +89,19 @@ func TestMakeZip(t *testing.T) {
 	is.NoErr(err)
 }
 
+func TestListZip(t *testing.T) {
+	is := is.New(t)
+
+	path := "test/archive.zip"
+
+	entries, err := fileList(path)
+	is.NoErr(err)
+
+	for _, file := range entries {
+		t.Logf("%+v", file)
+	}
+}
+
 func TestEnd(t *testing.T) {
 	is := is.New(t)
 	err := cleanup()
