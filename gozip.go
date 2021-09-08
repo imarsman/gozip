@@ -195,20 +195,20 @@ func printEntries(name string) (err error) {
 	if err != nil {
 		return
 	}
-	fmt.Printf("%0scompressed%3suncompressed%5sdate%-7stime%6sname\n", "", "", "", "", "")
+	fmt.Printf("%2scompressed%1suncompressed%6sdate%7stime%8sname\n", "", "", "", "", "")
 	fmt.Println(strings.Repeat("-", 75))
 
 	var totalCompressed int64 = 0
 	var totalUnCompressed int64 = 0
 	count := 0
 	for _, file := range entries {
-		fmt.Printf("%8d %12d %15s  %-7s  %-10s\n", file.compressedSize, file.uncompressedSize, file.date, file.time, file.name)
+		fmt.Printf("%12d %11d %12s  %-7s  %-10s\n", file.compressedSize, file.uncompressedSize, file.date, file.time, file.name)
 		totalCompressed += int64(file.compressedSize)
 		totalUnCompressed += int64(file.uncompressedSize)
 		count++
 	}
 	fmt.Println(strings.Repeat("-", 75))
-	fmt.Printf("%8d%13d%30d\n", totalCompressed, totalUnCompressed, count)
+	fmt.Printf("%12d%12d%27d\n", totalCompressed, totalUnCompressed, count)
 	return
 }
 
