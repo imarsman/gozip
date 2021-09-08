@@ -7,5 +7,15 @@ that are involved, namely i/o and file handling.
 
 ## Usage
 
+To build
+
+`go build .`
+
+To run tests
+
+`go test -v .`
 
 ## Notes
+
+Wherever a feature of the zip utility is implemented an attempt will be made to
+impliment it to behave identically.
