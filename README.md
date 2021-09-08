@@ -10,6 +10,9 @@ explore the protocol, find any issues, and overall learn more about the things
 that are involved, namely i/o and file handling. I also find it generally useful
 to learn how to pay close attention to exactly how things work.
 
+Zip has enough arguments without also trying to implement unzip. I'll save that
+for another project.
+
 ## Usage
 
 To build
