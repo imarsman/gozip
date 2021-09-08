@@ -195,20 +195,20 @@ func printEntries(name string) (err error) {
 	if err != nil {
 		return
 	}
-	fmt.Printf("%2slength%3scompressed%20suncompressed%9sdate%6stime\n", "", "", "", "", "")
-	fmt.Println(strings.Repeat("-", 76))
+	fmt.Printf("%0scompressed%3suncompressed%5sdate%-7stime%6sname\n", "", "", "", "", "")
+	fmt.Println(strings.Repeat("-", 70))
 
 	var totalCompressed int64 = 0
 	var totalUnCompressed int64 = 0
 	count := 0
 	for _, file := range entries {
-		fmt.Printf("%8d %12d %31s\t%-10s  %-10s\n", file.compressedSize, file.uncompressedSize, file.name, file.date, file.time)
+		fmt.Printf("%8d %12d %15s  %-7s  %-10s\n", file.compressedSize, file.uncompressedSize, file.date, file.time, file.name)
 		totalCompressed += int64(file.compressedSize)
 		totalUnCompressed += int64(file.uncompressedSize)
 		count++
 	}
-	fmt.Println(strings.Repeat("-", 76))
-	fmt.Printf("%8d%13d%32d\n", totalCompressed, totalUnCompressed, count)
+	fmt.Println(strings.Repeat("-", 70))
+	fmt.Printf("%8d%13d%30d\n", totalCompressed, totalUnCompressed, count)
 	return
 }
 
@@ -266,8 +266,6 @@ func archiveFiles(zipFileName string, fileEntries []fileEntry) (err error) {
 			fmt.Println(err)
 			return err
 		}
-
-		fmt.Printf("%+v\n", info)
 
 		header, _ := zip.FileInfoHeader(info)
 		header.Name = fileEntry.archivePath()
