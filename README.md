@@ -22,6 +22,25 @@ To run tests
 
 ## Notes
 
+Creating new archives and listing them works
+
+```
+compressed   uncompressed     date       time      name
+----------------------------------------------------------------------
+    7210         7210      2021-09-08  17:06:39  sample/1.txt
+    4621         4621      2021-09-08  17:06:39  sample/2.txt
+    2178         2178      2021-09-08  17:06:39  sample/3.txt
+    1827         1827      2021-09-08  17:06:39  sample/4.txt
+     918          918      2021-09-08  17:06:39  sample/5.txt
+    7210         7210      2021-09-07  23:26:00  sample/orig/1.txt
+    4621         4621      2021-09-07  23:26:00  sample/orig/2.txt
+    2178         2178      2021-09-07  23:26:00  sample/orig/3.txt
+    1827         1827      2021-09-07  23:26:00  sample/orig/4.txt
+     918          918      2021-09-07  23:26:00  sample/orig/5.txt
+----------------------------------------------------------------------
+   33508        33508                            10
+```
+
 Wherever a feature of the zip utility is implemented an attempt will be made to
 impliment it to behave identically.
 
