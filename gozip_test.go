@@ -94,12 +94,8 @@ func TestListZip(t *testing.T) {
 
 	path := "test/archive.zip"
 
-	entries, err := fileList(path)
+	err := printEntries(path)
 	is.NoErr(err)
-
-	for _, file := range entries {
-		t.Logf("%+v", file)
-	}
 }
 
 func TestEnd(t *testing.T) {

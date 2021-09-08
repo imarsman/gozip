@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/jwalton/gchalk"
 	"github.com/rickb777/go-arg"
@@ -185,17 +186,21 @@ type zipFileEntry struct {
 	name             string
 	compressedSize   uint64
 	uncompressedSize uint64
+	date             string
 }
 
-func printEntries(name string) {
+// printEntries of a zip file
+func printEntries(name string) (err error) {
 	entries, err := fileList(name)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, colour(brightRed, "no valid files found"))
-		os.Exit(1)
+		return
 	}
+	fmt.Printf("%2slength%3scompressed%20suncompressed\n", "", "", "")
+
 	for _, file := range entries {
-		fmt.Printf("name %s compressed %d uncompressed %d\n", file.name, file.compressedSize, file.uncompressedSize)
+		fmt.Printf("%8d %12d %31s\n", file.compressedSize, file.uncompressedSize, file.name)
 	}
+	return
 }
 
 func fileList(name string) (entries []zipFileEntry, err error) {
@@ -212,6 +217,8 @@ func fileList(name string) (entries []zipFileEntry, err error) {
 		entry.name = file.Name
 		entry.compressedSize = file.CompressedSize64
 		entry.uncompressedSize = file.UncompressedSize64
+		t := file.Modified.Format(time.RFC1123)
+		entry.date = t
 		entries = append(entries, entry)
 	}
 
