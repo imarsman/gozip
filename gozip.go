@@ -268,7 +268,7 @@ func archiveFiles(zipFileName string, fileEntries []fileEntry) (err error) {
 		}
 
 		header, _ := zip.FileInfoHeader(info)
-		header.Method = uint16(compressionLevel)
+		header.Method = compressionLevel
 		header.Name = fileEntry.archivePath()
 
 		zf, err := zipWriter.CreateHeader(header)
@@ -307,12 +307,12 @@ var args struct {
 	Recursive        bool     `arg:"-r" help:"recursive"`
 	Update           bool     `arg:"-u" help:"update existing"`
 	Add              bool     `arg:"-a" help:"add if not existing"`
-	CompressionLevel int      `arg:"L" help:"compression level"`
+	CompressionLevel uint16   `arg:"L" help:"compression level (0-9)"`
 	Zipfile          string   `arg:"positional"`
 	SourceFiles      []string `arg:"positional"`
 }
 
-var compressionLevel = 8
+var compressionLevel uint16 = 8
 
 func main() {
 	args.CompressionLevel = 6
@@ -337,6 +337,7 @@ func main() {
 		p.Fail(colour(brightRed, "either unzip or list must be specified"))
 	}
 
+	// less than 0 would probably thrown an error
 	if args.CompressionLevel < 0 || args.CompressionLevel > 9 {
 		args.CompressionLevel = 8
 		compressionLevel = args.CompressionLevel
