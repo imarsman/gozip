@@ -3,11 +3,10 @@ package main
 import (
 	"archive/zip"
 	"fmt"
-	"io"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/jwalton/gchalk"
 	"github.com/rickb777/go-arg"
@@ -155,7 +154,7 @@ func walkAllFilesInDir(path string, fileEntries *[]fileEntry, errorMsgs *[]strin
 }
 
 // getFileForWriting get file for new or upened zip file
-func getFileForWriting(path string) (archive *os.File, err error) {
+func getFileForWriting(path string) (file *os.File, err error) {
 	// _, err = os.Create(path)
 	// if err != nil {
 	// 	fmt.Fprintln(os.Stderr, colour(brightRed, err.Error()))
@@ -164,16 +163,16 @@ func getFileForWriting(path string) (archive *os.File, err error) {
 
 	if _, err = os.Stat(path); os.IsNotExist(err) {
 		// Handle new file
-		archive, err = os.Create(path)
+		file, err = os.Create(path)
 		if err != nil {
-			archive, err = os.OpenFile(path, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
+			file, err = os.OpenFile(path, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
 			if err != nil {
 				fmt.Fprintln(os.Stderr, colour(brightRed, err.Error()))
 				return
 			}
 		}
 	} else {
-		archive, err = os.OpenFile(path, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
+		file, err = os.OpenFile(path, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, colour(brightRed, err.Error()))
 			return
@@ -187,6 +186,7 @@ type zipFileEntry struct {
 	compressedSize   uint64
 	uncompressedSize uint64
 	date             string
+	time             string
 }
 
 // printEntries of a zip file
@@ -195,11 +195,20 @@ func printEntries(name string) (err error) {
 	if err != nil {
 		return
 	}
-	fmt.Printf("%2slength%3scompressed%20suncompressed\n", "", "", "")
+	fmt.Printf("%2slength%3scompressed%20suncompressed%9sdate%6stime\n", "", "", "", "", "")
+	fmt.Println(strings.Repeat("-", 76))
 
+	var totalCompressed int64 = 0
+	var totalUnCompressed int64 = 0
+	count := 0
 	for _, file := range entries {
-		fmt.Printf("%8d %12d %31s\n", file.compressedSize, file.uncompressedSize, file.name)
+		fmt.Printf("%8d %12d %31s\t%-10s  %-10s\n", file.compressedSize, file.uncompressedSize, file.name, file.date, file.time)
+		totalCompressed += int64(file.compressedSize)
+		totalUnCompressed += int64(file.uncompressedSize)
+		count++
 	}
+	fmt.Println(strings.Repeat("-", 76))
+	fmt.Printf("%8d%13d%32d\n", totalCompressed, totalUnCompressed, count)
 	return
 }
 
@@ -217,8 +226,10 @@ func fileList(name string) (entries []zipFileEntry, err error) {
 		entry.name = file.Name
 		entry.compressedSize = file.CompressedSize64
 		entry.uncompressedSize = file.UncompressedSize64
-		t := file.Modified.Format(time.RFC1123)
-		entry.date = t
+		d := file.Modified.Format("2006-01-02")
+		t := file.Modified.Format("15:04:05")
+		entry.date = d
+		entry.time = t
 		entries = append(entries, entry)
 	}
 
@@ -239,6 +250,7 @@ func archiveFiles(zipFileName string, fileEntries []fileEntry) (err error) {
 	zipWriter := zip.NewWriter(archive)
 	defer zipWriter.Close()
 
+	// https://github.com/golang/go/issues/18359
 	for _, fileEntry := range fileEntries {
 		file, err := os.Open(fileEntry.fullPath())
 		if err != nil {
@@ -247,15 +259,38 @@ func archiveFiles(zipFileName string, fileEntries []fileEntry) (err error) {
 		}
 		defer file.Close()
 
-		dest, err := zipWriter.Create(fileEntry.archivePath())
+		body, err := ioutil.ReadAll(file)
+
+		info, err := os.Stat(fileEntry.fullPath())
 		if err != nil {
-			fmt.Fprintln(os.Stderr, colour(brightRed, err.Error()))
-			continue
+			fmt.Println(err)
+			return err
 		}
-		if _, err := io.Copy(dest, file); err != nil {
-			fmt.Fprintln(os.Stderr, colour(brightRed, err.Error()))
-			continue
+
+		fmt.Printf("%+v\n", info)
+
+		header, _ := zip.FileInfoHeader(info)
+		header.Name = fileEntry.archivePath()
+
+		zf, err := zipWriter.CreateHeader(header)
+		if err != nil {
+			fmt.Println(err)
+			return err
 		}
+
+		if _, err := zf.Write(body); err != nil {
+			return err
+		}
+
+		// dest, err := zipWriter.Create(fileEntry.archivePath())
+		// if err != nil {
+		// 	fmt.Fprintln(os.Stderr, colour(brightRed, err.Error()))
+		// 	continue
+		// }
+		// if _, err := io.Copy(dest, file); err != nil {
+		// 	fmt.Fprintln(os.Stderr, colour(brightRed, err.Error()))
+		// 	continue
+		// }
 	}
 
 	return
