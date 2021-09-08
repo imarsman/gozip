@@ -20,6 +20,44 @@ const (
 	noColour // Can use to default to no colour output
 )
 
+type fileEntry struct {
+	rootPath   string
+	parentPath string
+	path       string
+	isBareFile bool
+}
+
+func hasEntry(check fileEntry, feList *[]fileEntry) (found bool) {
+	for _, fe := range *feList {
+		if check.fullPath() == fe.fullPath() {
+			return true
+		}
+	}
+	return
+}
+
+func (fe *fileEntry) fullPath() (fullPath string) {
+	fullPath = filepath.Join(fe.parentPath, fe.path)
+	// fmt.Printf("%+v\n", fe)
+	return
+}
+
+func (fe *fileEntry) archivePath() (archivePath string) {
+	if fe.isBareFile {
+		archivePath = filepath.Join(fe.parentPath, fe.path)
+		if strings.HasPrefix(archivePath, "/") {
+			archivePath = archivePath[1:]
+		}
+		return
+	}
+	archivePath = strings.Replace(fe.parentPath, fe.rootPath, "", 1)
+	archivePath = filepath.Join(archivePath, fe.path)
+	if strings.HasPrefix(archivePath, "/") && len(archivePath) > 1 {
+		archivePath = archivePath[1:]
+	}
+	return
+}
+
 func colour(colour int, input ...string) (output string) {
 	str := fmt.Sprint(strings.Join(input, " "))
 	str = strings.Replace(str, "  ", " ", -1)
@@ -95,7 +133,8 @@ func zipFiles(zipFilePath string, paths []string) (err error) {
 	return
 }
 
-func walkAllFilesInDir(path string, files *[]string, errorMsgs *[]string) (err error) {
+func walkAllFilesInDir(path string, fileEntries *[]fileEntry, errorMsgs *[]string) (err error) {
+	// fmt.Println("path", path, "relative path", rel)
 	var file *os.File
 	file, err = os.Open(path)
 	if err != nil {
@@ -111,26 +150,121 @@ func walkAllFilesInDir(path string, files *[]string, errorMsgs *[]string) (err e
 	}
 	defer file.Close()
 
+	rootPath, err := filepath.Abs(path)
+	rootPath = filepath.Dir(rootPath)
+
+	var curDir string
+	var basePath string
+
 	if !fileInfo.IsDir() {
-		*files = append(*files, path)
+		pth := path
+		if strings.HasPrefix(path, "/") {
+			pth = pth[1:]
+		}
+		fe := fileEntry{}
+		fe.rootPath = rootPath
+
+		abs, _ := filepath.Abs(path)
+		parentPath := filepath.Dir(abs)
+
+		fe.rootPath = filepath.Dir(rootPath)
+		fe.parentPath = parentPath
+
+		fe.path = fileInfo.Name()
+		fe.isBareFile = true
+
+		if !hasEntry(fe, fileEntries) {
+			*fileEntries = append(*fileEntries, fe)
+		}
 		return
 	}
 
-	basePath := path
-
-	return filepath.Walk(path, func(path string, info os.FileInfo, e error) error {
+	return filepath.Walk(path, func(path string, info os.FileInfo, e error) (err error) {
 		if err != nil {
 			*errorMsgs = append(*errorMsgs, e.Error())
 			return err
 		}
 
+		if info.Name() == filepath.Base(path) {
+			basePath, err = filepath.Abs(path)
+			basePath = filepath.Dir(basePath)
+		}
+		if info.IsDir() {
+			curDir = info.Name()
+			curDir = filepath.Join(basePath, curDir)
+		}
 		// check if it is a regular file (not dir)
 		if info.Mode().IsRegular() {
+			fe := fileEntry{}
+			fe.parentPath = curDir
+			fe.rootPath = rootPath
+
+			fe.path = filepath.Join(info.Name())
 			// start with base path since it is a directory
-			*files = append(*files, filepath.Join(basePath, path))
+			*fileEntries = append(*fileEntries, fe)
 		}
-		return nil
+		return
 	})
+}
+
+func getZipfile(path string) (archive *os.File, err error) {
+	_, err = os.Create(path)
+	if err != nil {
+
+	}
+
+	if _, err = os.Stat(path); os.IsNotExist(err) {
+		// Handle new file
+		archive, err = os.Create(path)
+		if err != nil {
+			archive, err = os.OpenFile(path, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
+			if err != nil {
+				return
+			}
+		}
+	} else {
+		archive, err = os.OpenFile(path, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
+		if err != nil {
+			return
+		}
+	}
+	return
+}
+
+// archiveFiles make a zip archive and fill with information from list of fileEntries
+func archiveFiles(zipFileName string, fileEntries []fileEntry) (err error) {
+	var archive *os.File
+	archive, err = getZipfile(zipFileName)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, colour(brightRed, err.Error()))
+		return
+	}
+
+	defer archive.Close()
+
+	zipWriter := zip.NewWriter(archive)
+	defer zipWriter.Close()
+
+	for _, fileEntry := range fileEntries {
+		file, err := os.Open(fileEntry.fullPath())
+		if err != nil {
+			fmt.Fprintln(os.Stderr, colour(brightRed, err.Error()))
+			continue
+		}
+		defer file.Close()
+
+		dest, err := zipWriter.Create(fileEntry.archivePath())
+		if err != nil {
+			fmt.Fprintln(os.Stderr, colour(brightRed, err.Error()))
+			continue
+		}
+		if _, err := io.Copy(dest, file); err != nil {
+			fmt.Fprintln(os.Stderr, colour(brightRed, err.Error()))
+			continue
+		}
+	}
+
+	return
 }
 
 func main() {
@@ -149,15 +283,15 @@ func main() {
 		}
 	}
 
-	var files = []string{}
+	var fileEntries = []fileEntry{}
 	var errorMsgs = []string{}
 
 	if !args.Unzip {
 		// Populate list of files
-		for _, file := range files {
-			walkAllFilesInDir(file, &files, &errorMsgs)
+		for _, file := range fileEntries {
+			walkAllFilesInDir(file.path, &fileEntries, &errorMsgs)
 		}
-		if len(files) == 0 {
+		if len(fileEntries) == 0 {
 			fmt.Fprintln(os.Stderr, colour(brightRed, "no valid files found"))
 			os.Exit(1)
 		}
@@ -169,39 +303,35 @@ func main() {
 	}
 
 	var archive *os.File
-	if _, err := os.Stat(args.Zipfile); os.IsNotExist(err) {
-		// Handle new file
-		archive, err = os.Create(args.Zipfile)
-		if err != nil {
-			return
-		}
-	} else {
-		archive, err = os.OpenFile(args.Zipfile, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
-		if err != nil {
-			return
-		}
+	archive, err := getZipfile(args.Zipfile)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, colour(brightRed, err.Error()))
+		os.Exit(1)
 	}
+
 	defer archive.Close()
 
-	zipWriter := zip.NewWriter(archive)
-	defer zipWriter.Close()
+	archiveFiles(args.Zipfile, fileEntries)
 
-	for _, path := range files {
-		file, err := os.Open("test.csv")
-		if err != nil {
-			fmt.Fprintln(os.Stderr, colour(brightRed, err.Error()))
-			continue
-		}
-		defer file.Close()
+	// zipWriter := zip.NewWriter(archive)
+	// defer zipWriter.Close()
 
-		dest, err := zipWriter.Create(path)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, colour(brightRed, err.Error()))
-			continue
-		}
-		if _, err := io.Copy(dest, file); err != nil {
-			fmt.Fprintln(os.Stderr, colour(brightRed, err.Error()))
-			continue
-		}
-	}
+	// for _, path := range files {
+	// 	file, err := os.Open(path.parentPath)
+	// 	if err != nil {
+	// 		fmt.Fprintln(os.Stderr, colour(brightRed, err.Error()))
+	// 		continue
+	// 	}
+	// 	defer file.Close()
+
+	// 	dest, err := zipWriter.Create(path.parentPath)
+	// 	if err != nil {
+	// 		fmt.Fprintln(os.Stderr, colour(brightRed, err.Error()))
+	// 		continue
+	// 	}
+	// 	if _, err := io.Copy(dest, file); err != nil {
+	// 		fmt.Fprintln(os.Stderr, colour(brightRed, err.Error()))
+	// 		continue
+	// 	}
+	// }
 }

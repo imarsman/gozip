@@ -59,18 +59,36 @@ func TestRunCmd(t *testing.T) {
 func TestGetFiles(t *testing.T) {
 	is := is.New(t)
 
-	var files = []string{}
+	var fileEntries = []fileEntry{}
 	var errorMsgs = []string{}
 
-	walkAllFilesInDir("./sample", &files, &errorMsgs)
+	walkAllFilesInDir("./sample", &fileEntries, &errorMsgs)
 
-	for _, f := range files {
-		t.Log(f)
+	for _, fe := range fileEntries {
+		t.Logf("%s", fe.fullPath())
 	}
 
 	err := runCmd("script/reset.sh")
 	is.NoErr(err)
 }
+
+func TestMakeZip(t *testing.T) {
+	is := is.New(t)
+
+	path := "./sample"
+	var fileEntries = []fileEntry{}
+	var errorMsgs = []string{}
+	// walk through dir or single file to get new entries
+	walkAllFilesInDir(path, &fileEntries, &errorMsgs)
+
+	path = "/Users/ian/git/gozip/sample/orig/1.txt"
+	// walk through dir or single file to get new entries
+	walkAllFilesInDir(path, &fileEntries, &errorMsgs)
+
+	err := archiveFiles("test/archive.zip", fileEntries)
+	is.NoErr(err)
+}
+
 func TestEnd(t *testing.T) {
 	is := is.New(t)
 	err := cleanup()

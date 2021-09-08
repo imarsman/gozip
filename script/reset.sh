@@ -3,6 +3,6 @@
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 
 cd "${SCRIPT_DIR}/../sample" || exit
-rm -f ./*gz
+rm -f ./*zip
 cp orig/*.txt .
 
