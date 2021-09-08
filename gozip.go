@@ -12,6 +12,7 @@ import (
 	"github.com/rickb777/go-arg"
 )
 
+// used for colour output
 const (
 	brightGreen = iota
 	brightYellow
@@ -20,6 +21,7 @@ const (
 	noColour // Can use to default to no colour output
 )
 
+// used to describe a file to be zipped
 type fileEntry struct {
 	rootPath   string
 	parentPath string
@@ -27,7 +29,8 @@ type fileEntry struct {
 	isBareFile bool
 }
 
-// hasEntry check for duplicate absolute paths
+// hasEntry check for duplicate absolute paths. Files could be put in more than
+// once since zip allows multiple dir/path args.
 func hasEntry(check fileEntry, feList *[]fileEntry) (found bool) {
 	for _, fe := range *feList {
 		if check.fullPath() == fe.fullPath() {
@@ -83,6 +86,7 @@ func colour(colour int, input ...string) (output string) {
 	return
 }
 
+// Walk a file or a directory and gatehr file entries and error messages
 func walkAllFilesInDir(path string, fileEntries *[]fileEntry, errorMsgs *[]string) (err error) {
 	// fmt.Println("path", path, "relative path", rel)
 	var file *os.File
@@ -153,7 +157,7 @@ func walkAllFilesInDir(path string, fileEntries *[]fileEntry, errorMsgs *[]strin
 	})
 }
 
-// getFileForWriting get file for new or upened zip file
+// getFileForWriting get file for new or upened file
 func getFileForWriting(path string) (file *os.File, err error) {
 	// _, err = os.Create(path)
 	// if err != nil {
@@ -181,6 +185,7 @@ func getFileForWriting(path string) (file *os.File, err error) {
 	return
 }
 
+// zipFileEntry represents data stored about a file to be zipped
 type zipFileEntry struct {
 	name             string
 	compressedSize   uint64
@@ -191,18 +196,25 @@ type zipFileEntry struct {
 
 // printEntries of a zip file
 func printEntries(name string) (err error) {
-	entries, err := fileList(name)
+	zipFileEntries, err := fileList(name)
 	if err != nil {
 		return
 	}
+	// I am no genius at formatting alignment
 	fmt.Printf("%2scompressed%1suncompressed%6sdate%7stime%8sname\n", "", "", "", "", "")
 	fmt.Println(strings.Repeat("-", 75))
 
 	var totalCompressed int64 = 0
 	var totalUnCompressed int64 = 0
 	count := 0
-	for _, file := range entries {
-		fmt.Printf("%12d %11d %12s  %-7s  %-10s\n", file.compressedSize, file.uncompressedSize, file.date, file.time, file.name)
+	for _, file := range zipFileEntries {
+		fmt.Printf("%12d %11d %12s  %-7s  %-10s\n",
+			file.compressedSize,
+			file.uncompressedSize,
+			file.date,
+			file.time,
+			file.name,
+		)
 		totalCompressed += int64(file.compressedSize)
 		totalUnCompressed += int64(file.uncompressedSize)
 		count++
@@ -212,6 +224,7 @@ func printEntries(name string) (err error) {
 	return
 }
 
+// fileList get list of files in zipfile
 func fileList(name string) (entries []zipFileEntry, err error) {
 	zf, err := zip.OpenReader(name)
 	if err != nil {
@@ -226,10 +239,10 @@ func fileList(name string) (entries []zipFileEntry, err error) {
 		entry.name = file.Name
 		entry.compressedSize = file.CompressedSize64
 		entry.uncompressedSize = file.UncompressedSize64
-		d := file.Modified.Format("2006-01-02")
-		t := file.Modified.Format("15:04:05")
-		entry.date = d
-		entry.time = t
+		dateStr := file.Modified.Format("2006-01-02") // get formatted date
+		timeStr := file.Modified.Format("15:04:05")   // get formatted time
+		entry.date = dateStr
+		entry.time = timeStr
 		entries = append(entries, entry)
 	}
 
@@ -267,6 +280,8 @@ func archiveFiles(zipFileName string, fileEntries []fileEntry) (err error) {
 			return err
 		}
 
+		// Using header method allows file data to be put in zip file for each
+		// entry. Can also just add the files and paths but then no metadata
 		header, _ := zip.FileInfoHeader(info)
 		header.Method = compressionLevel
 		header.Name = fileEntry.archivePath()
@@ -280,16 +295,6 @@ func archiveFiles(zipFileName string, fileEntries []fileEntry) (err error) {
 		if _, err := zf.Write(body); err != nil {
 			return err
 		}
-
-		// dest, err := zipWriter.Create(fileEntry.archivePath())
-		// if err != nil {
-		// 	fmt.Fprintln(os.Stderr, colour(brightRed, err.Error()))
-		// 	continue
-		// }
-		// if _, err := io.Copy(dest, file); err != nil {
-		// 	fmt.Fprintln(os.Stderr, colour(brightRed, err.Error()))
-		// 	continue
-		// }
 	}
 
 	return
@@ -312,7 +317,7 @@ var args struct {
 	SourceFiles      []string `arg:"positional"`
 }
 
-var compressionLevel uint16 = 8
+var compressionLevel uint16 = 8 // default compression level
 
 func main() {
 	args.CompressionLevel = 6
