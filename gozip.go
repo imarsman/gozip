@@ -306,7 +306,6 @@ func archiveFiles(zipFileName string, fileEntries []fileEntry) (err error) {
 */
 
 var args struct {
-	Unzip            bool     `arg:"-U" help:"unzip the archive"`
 	File             string   `arg:"-f" help:"verbosity level"`
 	List             bool     `arg:"l" help:"list entries in zip file"`
 	Recursive        bool     `arg:"-r" help:"recursive"`
@@ -326,20 +325,6 @@ func main() {
 
 	if args.Zipfile == "" {
 		p.Fail(colour(brightRed, "no zipfile specified"))
-	}
-
-	if args.Unzip {
-		if len(args.SourceFiles) > 0 {
-			p.Fail(colour(brightRed, "can't specify source files witn unzip"))
-		}
-	}
-	if !args.Unzip {
-		if len(args.SourceFiles) == 0 {
-			p.Fail(colour(brightRed, "no files to zip specified"))
-		}
-	}
-	if !args.Unzip && !args.List {
-		p.Fail(colour(brightRed, "either unzip or list must be specified"))
 	}
 
 	// less than 0 would probably thrown an error
@@ -362,15 +347,13 @@ func main() {
 	var fileEntries = []fileEntry{}
 	var errorMsgs = []string{}
 
-	if !args.Unzip {
-		// Populate list of files
-		for _, path := range args.SourceFiles {
-			walkAllFilesInDir(path, &fileEntries, &errorMsgs)
-		}
-		if len(fileEntries) == 0 {
-			fmt.Fprintln(os.Stderr, colour(brightRed, "no valid files found"))
-			os.Exit(1)
-		}
+	// Populate list of files
+	for _, path := range args.SourceFiles {
+		walkAllFilesInDir(path, &fileEntries, &errorMsgs)
+	}
+	if len(fileEntries) == 0 {
+		fmt.Fprintln(os.Stderr, colour(brightRed, "no valid files found"))
+		os.Exit(1)
 	}
 
 	// Show what has been found
