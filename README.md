@@ -32,6 +32,24 @@ To run tests
 
 `go test -v .`
 
+## Simple tests
+
+It's not as fast as the native zip.
+
+```
+time for i in {1..1000}; do ./gozip test/archive2.zip ./sample/; done
+
+real	0m6.936s
+user	0m3.693s
+sys	0m2.772s
+
+time for i in {1..1000}; do zip add -q test/archive2.zip ./sample/; done
+
+real	0m4.237s
+user	0m2.072s
+sys	0m1.760s
+```
+
 ## Notes
 
 Creating new archives and listing them works
