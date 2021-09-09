@@ -244,10 +244,12 @@ func zipFileList(name string) (entries []zipFileEntry, err error) {
 	if err != nil {
 		return
 	}
+
 	defer zf.Close()
 
 	entries = make([]zipFileEntry, 0, 0)
 
+	fmt.Println(len(zf.File))
 	for _, file := range zf.File {
 		entry := zipFileEntry{}
 		entry.name = file.Name
@@ -269,6 +271,20 @@ func zipFileList(name string) (entries []zipFileEntry, err error) {
 func archiveFiles(zipFileName string, fileEntries []fileEntry) (err error) {
 	var archive *os.File
 	var exists bool
+
+	archive, exists, err = getFileForWriting(zipFileName)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, colour(brightRed, err.Error()))
+		return
+	}
+
+	// This will end up opening the file more than once, which is not good
+	var zipFileEntries []zipFileEntry
+	if exists {
+		fmt.Println("exists", exists)
+		archive.Close()
+		zipFileEntries, err = zipFileList(zipFileName)
+	}
 	archive, exists, err = getFileForWriting(zipFileName)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, colour(brightRed, err.Error()))
@@ -291,10 +307,7 @@ func archiveFiles(zipFileName string, fileEntries []fileEntry) (err error) {
 
 	var changed bool
 
-	var zipFileEntries []zipFileEntry
-	if exists {
-		zipFileEntries, err = zipFileList(zipFileName)
-	}
+	fmt.Println(len(zipFileEntries))
 
 	// https://github.com/golang/go/issues/18359
 	for _, fileEntry := range fileEntries {
@@ -343,6 +356,7 @@ func archiveFiles(zipFileName string, fileEntries []fileEntry) (err error) {
 			// Update existing entries of an archive if newer on the file
 			// system. Does not add new files to the archive.
 			if args.Freshen {
+				fmt.Println(hasEntry, localNewer)
 				if hasEntry && localNewer {
 					if !args.Quiet {
 						fmt.Fprintln(os.Stdout, colour(noColour, fmt.Sprintf("freshen %s", fileEntry.archivePath())))
@@ -381,8 +395,10 @@ func archiveFiles(zipFileName string, fileEntries []fileEntry) (err error) {
 		}
 
 		if _, err = zf.Write(body); err != nil {
+			fmt.Println(err)
 			return err
 		}
+		zipWriter.Flush()
 		changed = true
 	}
 	if !changed {
