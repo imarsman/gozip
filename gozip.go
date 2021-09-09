@@ -3,7 +3,7 @@ package main
 import (
 	"archive/zip"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -45,6 +45,9 @@ func hasFileEntry(check fileEntry, feList *[]fileEntry) (found bool) {
 }
 
 func hasZipFileEntry(path string, feList *[]zipFileEntry) (found bool, fe zipFileEntry) {
+	if len(*feList) == 0 {
+		return
+	}
 	for _, fe = range *feList {
 		if path == fe.name {
 			found = true
@@ -243,7 +246,6 @@ func zipFileList(name string) (entries []zipFileEntry, err error) {
 
 	entries = make([]zipFileEntry, 0, 0)
 
-	fmt.Println(len(zf.File))
 	for _, file := range zf.File {
 		entry := zipFileEntry{}
 		entry.name = file.Name
@@ -284,7 +286,6 @@ func archiveFiles(zipFilePath string, fileEntries []fileEntry) (err error) {
 	var goodFileEntries = make([]fileEntry, 0, len(fileEntries))
 
 	for _, fileEntry := range fileEntries {
-		// fmt.Printf("%+v\n", fileEntry)
 		file, err := os.Open(fileEntry.fullPath())
 		if err != nil {
 			fmt.Fprintln(os.Stderr, colour(brightRed, err.Error()))
@@ -317,7 +318,6 @@ func archiveFiles(zipFilePath string, fileEntries []fileEntry) (err error) {
 		}
 		// Update existing entries if newer on the file system and add new files.
 		if args.Update {
-			fmt.Println(hasEntry, localNewer)
 			if hasEntry && localNewer {
 				if !args.Quiet {
 					goodFileEntries = append(goodFileEntries, fileEntry)
@@ -331,7 +331,6 @@ func archiveFiles(zipFilePath string, fileEntries []fileEntry) (err error) {
 		// Update existing entries of an archive if newer on the file
 		// system. Does not add new files to the archive.
 		if args.Freshen {
-			fmt.Println(hasEntry, localNewer)
 			if hasEntry && localNewer {
 				if !args.Quiet {
 					goodFileEntries = append(goodFileEntries, fileEntry)
@@ -339,36 +338,16 @@ func archiveFiles(zipFilePath string, fileEntries []fileEntry) (err error) {
 				}
 			}
 		}
-		// } else {
-		// 	if args.Add {
-		// 		if !args.Quiet {
-		// 			goodFileEntries = append(goodFileEntries, fileEntry)
-		// 			fmt.Fprintln(os.Stdout, colour(noColour, fmt.Sprintf("adding %s", fileEntry.archivePath())))
-		// 		}
-		// 	}
-		// 	if args.Update {
-		// 		if !args.Quiet {
-		// 			goodFileEntries = append(goodFileEntries, fileEntry)
-		// 			fmt.Fprintln(os.Stdout, colour(noColour, fmt.Sprintf("adding %s", fileEntry.archivePath())))
-		// 		}
-		// 	}
-		// 	// Don't add any new files with freshen
-		// 	if args.Freshen {
-
-		// 	}
-	}
-
-	for _, fileEntry := range goodFileEntries {
-		fmt.Printf("Got %+v\n", fileEntry)
 	}
 
 	if len(goodFileEntries) == 0 {
-		fmt.Println("err", err)
+		fmt.Fprintln(os.Stderr, colour(brightYellow, "Nothing to do"))
 		return
 	}
 
 	var archive *os.File
-	archive, err = os.OpenFile(zipFilePath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
+	// Truncate prior to working with zip file or extra bytes will accumulate
+	archive, err = os.Create(zipFilePath)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, colour(brightRed, err.Error()))
 		return
@@ -378,25 +357,24 @@ func archiveFiles(zipFilePath string, fileEntries []fileEntry) (err error) {
 
 	zipWriter := zip.NewWriter(archive)
 	defer zipWriter.Close()
+
 	var changed bool
 
 	// https://github.com/golang/go/issues/18359
 	for _, fileEntry := range goodFileEntries {
-		// // var write = true
-		file, err := os.Open(fileEntry.fullPath())
-		if err != nil {
-			fmt.Fprintln(os.Stderr, colour(brightRed, err.Error()))
-			continue
-		}
-		defer file.Close()
 
-		body, err := ioutil.ReadAll(file)
-		file.Close()
+		// body, err := ioutil.ReadAll(file)
+		// file.Close()
 
+		// fmt.Println("handling", fileEntry.fullPath())
 		info, err := os.Stat(fileEntry.fullPath())
 		if err != nil {
 			fmt.Println(err)
 			return err
+		}
+		if info.IsDir() {
+			fmt.Println("dir")
+			continue
 		}
 
 		// Using header method allows file data to be put in zip file for each
@@ -405,15 +383,26 @@ func archiveFiles(zipFilePath string, fileEntries []fileEntry) (err error) {
 		header.Method = zip.Deflate
 		header.Name = fileEntry.archivePath()
 
-		zf, err := zipWriter.CreateHeader(header)
+		headerWriter, err := zipWriter.CreateHeader(header)
 		if err != nil {
 			fmt.Println("err", err)
 			return err
 		}
 
-		if _, err = zf.Write(body); err != nil {
+		currentFile, err := os.Open(fileEntry.fullPath())
+		if err != nil {
+			fmt.Fprintln(os.Stderr, colour(brightRed, err.Error()))
+			continue
+		}
+		defer currentFile.Close()
+
+		_, err = io.Copy(headerWriter, currentFile)
+		if err != nil {
 			return err
 		}
+		// zipWriter.Flush()
+		// currentFile.Close()
+
 		changed = true
 	}
 	if !changed {
