@@ -13,6 +13,16 @@ to learn how to pay close attention to exactly how things work.
 Zip has enough arguments without also trying to implement unzip. I'll save that
 for another project.
 
+## Arguments
+
+* `gozip -h` - print usage information
+* `gozip -l <zipfile>` - list contents of zipfile
+* `gozip <zipfile> <file>...` - default to freshen
+* `gozip -a <zipfile> <file>...` - add and update files
+* `gozip -u <zipfile> <file>...` - update if newer and add
+* `gozip -f <zipfile> <file>...` - only update newer files already in archive
+* `gozip -c 6 <zipfile> <file>...` - set compression level (0-9)
+
 ## Usage
 
 To build
