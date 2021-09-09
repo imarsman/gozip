@@ -3,9 +3,9 @@ module github.com/imarsman/gozip
 go 1.17
 
 require (
+	github.com/alexflint/go-arg v1.4.2
 	github.com/jwalton/gchalk v1.1.0
 	github.com/matryer/is v1.4.0
-	github.com/rickb777/go-arg v0.0.0-20171002133623-ba9514f0be00
 )
 
 require (

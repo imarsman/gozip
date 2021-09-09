@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/alexflint/go-arg"
 	"github.com/jwalton/gchalk"
-	"github.com/rickb777/go-arg"
 )
 
 func init() {
@@ -368,54 +368,43 @@ func archiveFiles(zipFileName string, fileEntries []fileEntry) (err error) {
 */
 
 var args struct {
-	File string `arg:"-f" help:"verbosity level"`
-	List bool   `arg:"l" help:"list entries in zip file"`
-	// Recursive        bool     `arg:"-r" help:"recursive"`
+	// File             string   `arg:"-required" help:"zipfile to make or use"`
+	List             bool     `arg:"-l" help:"list entries in zip file"`
 	Add              bool     `arg:"-a" help:"add and update"`
 	Update           bool     `arg:"-u" help:"update if newer and add new"`
 	Freshen          bool     `arg:"-f" help:"freshen newer only"`
-	CompressionLevel uint16   `arg:"L" help:"compression level (0-9)"`
-	Zipfile          string   `arg:"positional"`
+	CompressionLevel uint16   `arg:"-L" help:"compression level (0-9) - defaults to 6"`
+	Zipfile          string   `arg:"positional,required"`
 	SourceFiles      []string `arg:"positional"`
 }
 
-var compressionLevel uint16 = 8 // default compression level
-var action string
+var compressionLevel uint16 = 8 // default compression level for zip
 
 func main() {
 	args.CompressionLevel = 6
 	p := arg.MustParse(&args)
-	fmt.Println(args.File)
 
-	if args.Zipfile == "" {
-		p.Fail(colour(brightRed, "no zipfile specified"))
+	if !args.Add && !args.Update && !args.Freshen {
+		args.Freshen = true
 	}
 
-	if args.Add && !args.Update && !args.Freshen {
-
-	} else if !args.Add && args.Update && !args.Freshen {
-
-	} else if !args.Add && !args.Update && args.Freshen {
-
-	} else {
-		args.Freshen = true
+	if len(args.SourceFiles) == 0 && !args.List {
+		p.Fail(colour(brightRed, "source files required with no -l parameter"))
 	}
 
 	// less than 0 would probably thrown an error
 	if args.CompressionLevel < 0 || args.CompressionLevel > 9 {
-		args.CompressionLevel = 8
+		args.CompressionLevel = 6
 		compressionLevel = args.CompressionLevel
 	}
 
 	if args.List {
-		entries, err := fileList(args.Zipfile)
+		err := printEntries(args.Zipfile)
 		if err != nil {
-			fmt.Fprintln(os.Stderr, colour(brightRed, "no valid files found"))
+			fmt.Fprintln(os.Stderr, colour(brightRed, err.Error()))
 			os.Exit(1)
 		}
-		for _, file := range entries {
-			fmt.Printf("name %s compressed %d uncompressed %d\n", file.name, file.compressedSize, file.uncompressedSize)
-		}
+		os.Exit(0)
 	}
 
 	var fileEntries = []fileEntry{}
