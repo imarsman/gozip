@@ -289,7 +289,12 @@ func archiveFiles(zipFileName string, fileEntries []fileEntry) (err error) {
 	zipWriter := zip.NewWriter(archive)
 	defer zipWriter.Close()
 
-	// var changed bool
+	var changed bool
+
+	var zipFileEntries []zipFileEntry
+	if exists {
+		zipFileEntries, err = zipFileList(zipFileName)
+	}
 
 	// https://github.com/golang/go/issues/18359
 	for _, fileEntry := range fileEntries {
@@ -311,67 +316,57 @@ func archiveFiles(zipFileName string, fileEntries []fileEntry) (err error) {
 		// There is something wrong with the logic - nothing gets put in the
 		// archive
 
-		// var zipFileEntries []zipFileEntry
-		// if exists {
-		// 	zipFileEntries, err = zipFileList(zipFileName)
-		// }
-
-		// hasEntry, entry := hasZipFileEntry(fileEntry.archivePath(), &zipFileEntries)
-		// localNewer := entry.timestamp.Unix() < info.ModTime().Unix()
-		// // localSame := entry.timestamp.Unix() == info.ModTime().Unix()
-		// if exists {
-		// 	if args.Add {
-		// 		if hasEntry {
-		// 			if !args.Quiet {
-		// 				fmt.Fprintln(os.Stdout, colour(noColour, fmt.Sprintf("updating %s", fileEntry.archivePath())))
-		// 			}
-		// 		} else {
-		// 			if !args.Quiet {
-		// 				fmt.Fprintln(os.Stdout, colour(noColour, fmt.Sprintf("adding %s", fileEntry.archivePath())))
-		// 			}
-		// 		}
-		// 	}
-		// 	// Update existing entries if newer on the file system and add new files.
-		// 	if args.Update {
-		// 		if hasEntry && localNewer {
-		// 			if !args.Quiet {
-		// 				fmt.Fprintln(os.Stdout, colour(noColour, fmt.Sprintf("updating %s", fileEntry.archivePath())))
-		// 			}
-		// 		}
-		// 	}
-		// 	// Update existing entries of an archive if newer on the file
-		// 	// system. Does not add new files to the archive.
-		// 	if args.Freshen {
-		// 		if hasEntry && localNewer {
-		// 			if !args.Quiet {
-		// 				fmt.Fprintln(os.Stdout, colour(noColour, fmt.Sprintf("freshen %s", fileEntry.archivePath())))
-		// 			}
-		// 		} else if hasEntry {
-		// 			continue
-		// 		}
-		// 	}
-		// } else {
-		// 	if args.Add {
-		// 		if !args.Quiet {
-		// 			fmt.Fprintln(os.Stdout, colour(noColour, fmt.Sprintf("adding %s", fileEntry.archivePath())))
-		// 		}
-		// 	}
-		// 	if args.Update {
-		// 		if !args.Quiet {
-		// 			fmt.Fprintln(os.Stdout, colour(noColour, fmt.Sprintf("updating %s", fileEntry.archivePath())))
-		// 		}
-		// 	}
-		// 	// Don't add any new files with freshen
-		// 	if args.Freshen {
-		// 		continue
-		// 	}
-		// }
-		// if !changed {
-		// 	if !args.Quiet {
-		// 		fmt.Println("no changes made")
-		// 	}
-		// 	return nil
-		// }
+		hasEntry, entry := hasZipFileEntry(fileEntry.archivePath(), &zipFileEntries)
+		localNewer := entry.timestamp.Unix() < info.ModTime().Unix()
+		// fmt.Println(hasEntry, localNewer, fileEntry.path)
+		// localSame := entry.timestamp.Unix() == info.ModTime().Unix()
+		if exists {
+			if args.Add {
+				if hasEntry {
+					if !args.Quiet {
+						fmt.Fprintln(os.Stdout, colour(noColour, fmt.Sprintf("updating %s", fileEntry.archivePath())))
+					}
+				} else {
+					if !args.Quiet {
+						fmt.Fprintln(os.Stdout, colour(noColour, fmt.Sprintf("adding %s", fileEntry.archivePath())))
+					}
+				}
+			}
+			// Update existing entries if newer on the file system and add new files.
+			if args.Update {
+				if hasEntry && localNewer {
+					if !args.Quiet {
+						fmt.Fprintln(os.Stdout, colour(noColour, fmt.Sprintf("updating %s", fileEntry.archivePath())))
+					}
+				}
+			}
+			// Update existing entries of an archive if newer on the file
+			// system. Does not add new files to the archive.
+			if args.Freshen {
+				if hasEntry && localNewer {
+					if !args.Quiet {
+						fmt.Fprintln(os.Stdout, colour(noColour, fmt.Sprintf("freshen %s", fileEntry.archivePath())))
+					}
+				} else if hasEntry {
+					continue
+				}
+			}
+		} else {
+			if args.Add {
+				if !args.Quiet {
+					fmt.Fprintln(os.Stdout, colour(noColour, fmt.Sprintf("adding %s", fileEntry.archivePath())))
+				}
+			}
+			if args.Update {
+				if !args.Quiet {
+					fmt.Fprintln(os.Stdout, colour(noColour, fmt.Sprintf("updating %s", fileEntry.archivePath())))
+				}
+			}
+			// Don't add any new files with freshen
+			if args.Freshen {
+				continue
+			}
+		}
 
 		// Using header method allows file data to be put in zip file for each
 		// entry. Can also just add the files and paths but then no metadata
@@ -379,6 +374,7 @@ func archiveFiles(zipFileName string, fileEntries []fileEntry) (err error) {
 		header.Method = zip.Deflate
 		header.Name = fileEntry.archivePath()
 
+		changed = true
 		zf, err := zipWriter.CreateHeader(header)
 		if err != nil {
 			fmt.Println("err", err)
@@ -388,6 +384,12 @@ func archiveFiles(zipFileName string, fileEntries []fileEntry) (err error) {
 		if _, err = zf.Write(body); err != nil {
 			return err
 		}
+	}
+	if !changed {
+		if !args.Quiet {
+			fmt.Println("no changes made")
+		}
+		// break loop
 	}
 
 	return
