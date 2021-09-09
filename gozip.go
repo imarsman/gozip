@@ -374,7 +374,6 @@ func archiveFiles(zipFileName string, fileEntries []fileEntry) (err error) {
 		header.Method = zip.Deflate
 		header.Name = fileEntry.archivePath()
 
-		changed = true
 		zf, err := zipWriter.CreateHeader(header)
 		if err != nil {
 			fmt.Println("err", err)
@@ -384,6 +383,7 @@ func archiveFiles(zipFileName string, fileEntries []fileEntry) (err error) {
 		if _, err = zf.Write(body); err != nil {
 			return err
 		}
+		changed = true
 	}
 	if !changed {
 		if !args.Quiet {
