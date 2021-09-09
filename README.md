@@ -21,7 +21,6 @@ for another project.
 * `gozip -a <zipfile> <file>...` - add and update files
 * `gozip -u <zipfile> <file>...` - update if newer and add
 * `gozip -f <zipfile> <file>...` - only update newer files already in archive
-* `gozip -c 6 <zipfile> <file>...` - set compression level (0-9)
 
 ## Usage
 
