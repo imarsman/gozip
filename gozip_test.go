@@ -85,6 +85,8 @@ func TestMakeZip(t *testing.T) {
 	// walk through dir or single file to get new entries
 	walkAllFilesInDir(path, &fileEntries, &errorMsgs)
 
+	// Set flag that determines choices for dealing with files
+	args.Update = true
 	err := archiveFiles("test/archive.zip", fileEntries)
 	is.NoErr(err)
 }

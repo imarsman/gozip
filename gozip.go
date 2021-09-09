@@ -13,6 +13,9 @@ import (
 	"github.com/rickb777/go-arg"
 )
 
+func init() {
+}
+
 // used for colour output
 const (
 	brightGreen = iota
@@ -329,6 +332,14 @@ func archiveFiles(zipFileName string, fileEntries []fileEntry) (err error) {
 					continue
 				}
 			}
+		} else {
+			// Don't add any new files with freshen
+			if args.Freshen {
+				continue
+			}
+		}
+		if args.Add {
+			fmt.Fprintln(os.Stderr, colour(noColour, fmt.Sprintf("adding %s", fileEntry.archivePath())))
 		}
 
 		// Using header method allows file data to be put in zip file for each
