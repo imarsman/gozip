@@ -55,7 +55,3 @@ Creating new archives and listing them works
 
 Wherever a feature of the zip utility is implemented an attempt will be made to
 impliment it to behave identically.
-
-The argument parsing library used here does not deal with arguments such as -1,
--2, -, etc. It may be that an argument will need to have a different identifier to
-work around this.
