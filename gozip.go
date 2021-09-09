@@ -278,7 +278,9 @@ func archiveFiles(zipFileName string, fileEntries []fileEntry) (err error) {
 	// Warn about creating new archive if -u was used and the file doesn't exist
 	if !exists {
 		if args.Update {
-			fmt.Fprintln(os.Stderr, colour(brightRed, "creating new archive"))
+			if !args.Quiet {
+				fmt.Fprintln(os.Stderr, colour(brightRed, "creating new archive"))
+			}
 		}
 	}
 
@@ -286,6 +288,8 @@ func archiveFiles(zipFileName string, fileEntries []fileEntry) (err error) {
 
 	zipWriter := zip.NewWriter(archive)
 	defer zipWriter.Close()
+
+	var changed bool
 
 	// https://github.com/golang/go/issues/18359
 	for _, fileEntry := range fileEntries {
@@ -307,40 +311,67 @@ func archiveFiles(zipFileName string, fileEntries []fileEntry) (err error) {
 		// There is something wrong with the logic - nothing gets put in the
 		// archive
 
-		// var zipFileEntries []zipFileEntry
-		// if exists {
-		// 	zipFileEntries, err = zipFileList(zipFileName)
-		// }
+		var zipFileEntries []zipFileEntry
+		if exists {
+			zipFileEntries, err = zipFileList(zipFileName)
+		}
 
-		// hasEntry, entry := hasZipFileEntry(fileEntry.archivePath(), &zipFileEntries)
-		// localNewer := entry.timestamp.Unix() < info.ModTime().Unix()
+		hasEntry, entry := hasZipFileEntry(fileEntry.archivePath(), &zipFileEntries)
+		localNewer := entry.timestamp.Unix() < info.ModTime().Unix()
 		// localSame := entry.timestamp.Unix() == info.ModTime().Unix()
 		// args.Add meand add and update
-		// fmt.Println(args.Add, args.Update, args.Freshen)
-		// if exists {
-		// 	// Update existing entries if newer on the file system and add new files.
-		// 	if args.Update {
-		// 		if hasEntry && localNewer {
-		// 			fmt.Fprintln(os.Stderr, colour(noColour, fmt.Sprintf("updating %s", fileEntry.archivePath())))
-		// 		}
-		// 	}
-		// 	// Update existing entries of an archive if newer on the file
-		// 	// system. Does not add new files to the archive.
-		// 	if args.Freshen {
-		// 		if hasEntry && localNewer {
-		// 			fmt.Fprintln(os.Stderr, colour(noColour, fmt.Sprintf("updating %s", fileEntry.archivePath())))
-		// 		} else if !hasEntry {
-		// 			continue
-		// 		}
-		// 	}
-		// } else {
-		// 	// Don't add any new files with freshen
-		// 	if args.Freshen {
-		// 		continue
-		// 	}
-		// }
+		// fmt.Println(args.Add, args.Update, args.Freshen, hasEntry, localNewer)
+		if exists {
+			if args.Add {
+				if hasEntry {
+					if !args.Quiet {
+						fmt.Fprintln(os.Stdout, colour(noColour, fmt.Sprintf("updating %s", fileEntry.archivePath())))
+					}
+				} else {
+					if !args.Quiet {
+						fmt.Fprintln(os.Stdout, colour(noColour, fmt.Sprintf("adding %s", fileEntry.archivePath())))
+					}
+				}
+			}
+			// Update existing entries if newer on the file system and add new files.
+			if args.Update {
+				if hasEntry && localNewer {
+					if !args.Quiet {
+						fmt.Fprintln(os.Stdout, colour(noColour, fmt.Sprintf("updating %s", fileEntry.archivePath())))
+					}
+				}
+			}
+			// Update existing entries of an archive if newer on the file
+			// system. Does not add new files to the archive.
+			if args.Freshen {
+				if hasEntry && localNewer {
+					if !args.Quiet {
+						fmt.Fprintln(os.Stdout, colour(noColour, fmt.Sprintf("freshen %s", fileEntry.archivePath())))
+					}
+				} else if hasEntry {
+					continue
+				}
+			}
+		} else {
+			if args.Add {
+				if !args.Quiet {
+					fmt.Fprintln(os.Stdout, colour(noColour, fmt.Sprintf("adding %s", fileEntry.archivePath())))
+				}
+			}
+			if args.Update {
+				if !args.Quiet {
+					fmt.Fprintln(os.Stdout, colour(noColour, fmt.Sprintf("updating %s", fileEntry.archivePath())))
+				}
+			}
+			// Don't add any new files with freshen
+			if args.Freshen {
+				continue
+				// fmt.Fprintln(os.Stdout, colour(noColour, fmt.Sprintf("freshen %s", fileEntry.archivePath())))
+			}
+		}
+		changed = true
 		// if args.Add {
-		// 	fmt.Fprintln(os.Stderr, colour(noColour, fmt.Sprintf("adding %s", fileEntry.archivePath())))
+		// 	fmt.Fprintln(os.Stdout, colour(noColour, fmt.Sprintf("adding %s", fileEntry.archivePath())))
 		// }
 
 		// Using header method allows file data to be put in zip file for each
@@ -360,6 +391,9 @@ func archiveFiles(zipFileName string, fileEntries []fileEntry) (err error) {
 			return err
 		}
 	}
+	if !changed && !args.Quiet {
+		fmt.Println("No changes made")
+	}
 
 	return
 }
@@ -370,11 +404,11 @@ func archiveFiles(zipFileName string, fileEntries []fileEntry) (err error) {
 */
 
 var args struct {
-	// File             string   `arg:"-required" help:"zipfile to make or use"`
 	List    bool `arg:"-l" help:"list entries in zip file"`
 	Add     bool `arg:"-a" help:"add and update"`
 	Update  bool `arg:"-u" help:"update if newer and add new"`
 	Freshen bool `arg:"-f" help:"freshen newer only"`
+	Quiet   bool `arg:"-q" help:"suppress normal output"`
 	// Not currently supported in Go library
 	// CompressionLevel uint16   `arg:"-L" derault:"6" help:"compression level (0-9) - defaults to 6" placeholder:"6"`
 	Zipfile     string   `arg:"positional,required" placeholder:"zipfile"`
