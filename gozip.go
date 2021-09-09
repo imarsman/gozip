@@ -323,7 +323,7 @@ func archiveFiles(zipFilePath string, fileEntries []fileEntry) (err error) {
 					goodFileEntries = append(goodFileEntries, fileEntry)
 					fmt.Fprintln(os.Stdout, colour(noColour, fmt.Sprintf("updating %s", fileEntry.archivePath())))
 				}
-			} else {
+			} else if !hasEntry {
 				goodFileEntries = append(goodFileEntries, fileEntry)
 				fmt.Fprintln(os.Stdout, colour(noColour, fmt.Sprintf("adding %s", fileEntry.archivePath())))
 			}
@@ -360,21 +360,17 @@ func archiveFiles(zipFilePath string, fileEntries []fileEntry) (err error) {
 
 	var changed bool
 
-	// https://github.com/golang/go/issues/18359
-	for _, fileEntry := range goodFileEntries {
-
-		// body, err := ioutil.ReadAll(file)
-		// file.Close()
-
-		// fmt.Println("handling", fileEntry.fullPath())
+	// I presume that a nested function will still work with defer
+	var archiveFile = func(fileEntry fileEntry) (err error) {
 		info, err := os.Stat(fileEntry.fullPath())
 		if err != nil {
 			fmt.Println(err)
 			return err
 		}
+
+		// Should not happen as we ignore dirs when gathering
 		if info.IsDir() {
-			fmt.Println("dir")
-			continue
+			return
 		}
 
 		// Using header method allows file data to be put in zip file for each
@@ -391,20 +387,28 @@ func archiveFiles(zipFilePath string, fileEntries []fileEntry) (err error) {
 
 		currentFile, err := os.Open(fileEntry.fullPath())
 		if err != nil {
+			currentFile.Close()
 			fmt.Fprintln(os.Stderr, colour(brightRed, err.Error()))
-			continue
+			return
 		}
 		defer currentFile.Close()
 
 		_, err = io.Copy(headerWriter, currentFile)
 		if err != nil {
-			return err
+			return
 		}
-		// zipWriter.Flush()
-		// currentFile.Close()
 
 		changed = true
+		return
 	}
+
+	for _, fileEntry := range goodFileEntries {
+		err = archiveFile(fileEntry)
+		if err != nil {
+			return
+		}
+	}
+
 	if !changed {
 		if !args.Quiet {
 			fmt.Println("no changes made")
