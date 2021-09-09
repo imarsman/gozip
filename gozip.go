@@ -171,12 +171,6 @@ func walkAllFilesInDir(path string, fileEntries *[]fileEntry, errorMsgs *[]strin
 
 // getFileForWriting get file for new or upened file
 func getFileForWriting(path string) (file *os.File, exists bool, err error) {
-	// _, err = os.Create(path)
-	// if err != nil {
-	// 	fmt.Fprintln(os.Stderr, colour(brightRed, err.Error()))
-	// 	return
-	// }
-
 	if _, err = os.Stat(path); os.IsNotExist(err) {
 		// Handle new file
 		file, err = os.Create(path)
@@ -279,8 +273,6 @@ func archiveFiles(zipFilePath string, fileEntries []fileEntry) (err error) {
 		}
 	}
 
-	var archive *os.File
-
 	var exists bool = true
 
 	// This will end up opening the file more than once, which is not good
@@ -292,7 +284,7 @@ func archiveFiles(zipFilePath string, fileEntries []fileEntry) (err error) {
 	var goodFileEntries = make([]fileEntry, 0, len(fileEntries))
 
 	for _, fileEntry := range fileEntries {
-		// var write = true
+		// fmt.Printf("%+v\n", fileEntry)
 		file, err := os.Open(fileEntry.fullPath())
 		if err != nil {
 			fmt.Fprintln(os.Stderr, colour(brightRed, err.Error()))
@@ -308,65 +300,66 @@ func archiveFiles(zipFilePath string, fileEntries []fileEntry) (err error) {
 			return err
 		}
 
-		// There is something wrong with the logic - nothing gets put in the
-		// archive
-
 		hasEntry, entry := hasZipFileEntry(fileEntry.archivePath(), &zipFileEntries)
 		localNewer := entry.timestamp.Unix() < info.ModTime().Unix()
-		if exists {
-			if args.Add {
-				if hasEntry {
-					if !args.Quiet {
-						goodFileEntries = append(goodFileEntries, fileEntry)
-						fmt.Fprintln(os.Stdout, colour(noColour, fmt.Sprintf("updating %s", fileEntry.archivePath())))
-					}
-				} else {
-					if !args.Quiet {
-						goodFileEntries = append(goodFileEntries, fileEntry)
-						fmt.Fprintln(os.Stdout, colour(noColour, fmt.Sprintf("adding %s", fileEntry.archivePath())))
-					}
+		if args.Add {
+			if hasEntry {
+				if !args.Quiet {
+					goodFileEntries = append(goodFileEntries, fileEntry)
+					fmt.Fprintln(os.Stdout, colour(noColour, fmt.Sprintf("updating %s", fileEntry.archivePath())))
 				}
-			}
-			// Update existing entries if newer on the file system and add new files.
-			if args.Update {
-				if hasEntry && localNewer {
-					if !args.Quiet {
-						goodFileEntries = append(goodFileEntries, fileEntry)
-						fmt.Fprintln(os.Stdout, colour(noColour, fmt.Sprintf("updating %s", fileEntry.archivePath())))
-					}
-				}
-			}
-			// Update existing entries of an archive if newer on the file
-			// system. Does not add new files to the archive.
-			if args.Freshen {
-				fmt.Println(hasEntry, localNewer)
-				if hasEntry && localNewer {
-					if !args.Quiet {
-						goodFileEntries = append(goodFileEntries, fileEntry)
-						fmt.Fprintln(os.Stdout, colour(noColour, fmt.Sprintf("freshen %s", fileEntry.archivePath())))
-					}
-				} else if hasEntry {
-					continue
-				}
-			}
-		} else {
-			if args.Add {
+			} else {
 				if !args.Quiet {
 					goodFileEntries = append(goodFileEntries, fileEntry)
 					fmt.Fprintln(os.Stdout, colour(noColour, fmt.Sprintf("adding %s", fileEntry.archivePath())))
 				}
-			}
-			if args.Update {
-				if !args.Quiet {
-					goodFileEntries = append(goodFileEntries, fileEntry)
-					fmt.Fprintln(os.Stdout, colour(noColour, fmt.Sprintf("adding %s", fileEntry.archivePath())))
-				}
-			}
-			// Don't add any new files with freshen
-			if args.Freshen {
-
 			}
 		}
+		// Update existing entries if newer on the file system and add new files.
+		if args.Update {
+			fmt.Println(hasEntry, localNewer)
+			if hasEntry && localNewer {
+				if !args.Quiet {
+					goodFileEntries = append(goodFileEntries, fileEntry)
+					fmt.Fprintln(os.Stdout, colour(noColour, fmt.Sprintf("updating %s", fileEntry.archivePath())))
+				}
+			} else {
+				goodFileEntries = append(goodFileEntries, fileEntry)
+				fmt.Fprintln(os.Stdout, colour(noColour, fmt.Sprintf("adding %s", fileEntry.archivePath())))
+			}
+		}
+		// Update existing entries of an archive if newer on the file
+		// system. Does not add new files to the archive.
+		if args.Freshen {
+			fmt.Println(hasEntry, localNewer)
+			if hasEntry && localNewer {
+				if !args.Quiet {
+					goodFileEntries = append(goodFileEntries, fileEntry)
+					fmt.Fprintln(os.Stdout, colour(noColour, fmt.Sprintf("freshen %s", fileEntry.archivePath())))
+				}
+			}
+		}
+		// } else {
+		// 	if args.Add {
+		// 		if !args.Quiet {
+		// 			goodFileEntries = append(goodFileEntries, fileEntry)
+		// 			fmt.Fprintln(os.Stdout, colour(noColour, fmt.Sprintf("adding %s", fileEntry.archivePath())))
+		// 		}
+		// 	}
+		// 	if args.Update {
+		// 		if !args.Quiet {
+		// 			goodFileEntries = append(goodFileEntries, fileEntry)
+		// 			fmt.Fprintln(os.Stdout, colour(noColour, fmt.Sprintf("adding %s", fileEntry.archivePath())))
+		// 		}
+		// 	}
+		// 	// Don't add any new files with freshen
+		// 	if args.Freshen {
+
+		// 	}
+	}
+
+	for _, fileEntry := range goodFileEntries {
+		fmt.Printf("Got %+v\n", fileEntry)
 	}
 
 	if len(goodFileEntries) == 0 {
@@ -374,6 +367,7 @@ func archiveFiles(zipFilePath string, fileEntries []fileEntry) (err error) {
 		return
 	}
 
+	var archive *os.File
 	archive, err = os.OpenFile(zipFilePath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, colour(brightRed, err.Error()))
@@ -498,30 +492,6 @@ func main() {
 		fmt.Fprintln(os.Stderr, colour(brightRed, "no valid files found"))
 		os.Exit(1)
 	}
-
-	fmt.Println("looking for file", args.Zipfile)
-	if _, err := os.Stat(args.Zipfile); os.IsNotExist(err) {
-		createEmptyZip(args.Zipfile)
-		if args.Freshen {
-			fmt.Fprintln(os.Stderr, colour(brightRed, "file does not exist and -f is specified - nothing to do"))
-
-			os.Exit(0)
-		}
-	}
-
-	// Show what has been found
-	// for _, fileEntry := range fileEntries {
-	// 	fmt.Printf("Entry %+v\n", fileEntry)
-	// }
-
-	var archiveFile *os.File
-	archiveFile, _, err := getFileForWriting(args.Zipfile)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, colour(brightRed, err.Error()))
-		os.Exit(1)
-	}
-
-	defer archiveFile.Close()
 
 	archiveFiles(args.Zipfile, fileEntries)
 }
