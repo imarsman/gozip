@@ -47,7 +47,6 @@ func hasFileEntry(check fileEntry, feList *[]fileEntry) (found bool) {
 func hasZipFileEntry(path string, feList *[]zipFileEntry) (found bool, fe zipFileEntry) {
 	for _, fe = range *feList {
 		if path == fe.name {
-			// fmt.Println(path, fe.name)
 			found = true
 			return
 		}
@@ -58,7 +57,6 @@ func hasZipFileEntry(path string, feList *[]zipFileEntry) (found bool, fe zipFil
 // fullPath get full path for an entry
 func (fe *fileEntry) fullPath() (fullPath string) {
 	fullPath = filepath.Join(fe.parentPath, fe.path)
-	// fmt.Printf("%+v\n", fe)
 	return
 }
 
@@ -103,7 +101,6 @@ func colour(colour int, input ...string) (output string) {
 
 // Walk a file or a directory and gatehr file entries and error messages
 func walkAllFilesInDir(path string, fileEntries *[]fileEntry, errorMsgs *[]string) (err error) {
-	// fmt.Println("path", path, "relative path", rel)
 	var file *os.File
 	file, err = os.Open(path)
 	if err != nil {
@@ -213,7 +210,7 @@ type zipFileEntry struct {
 
 // printEntries of a zip file
 func printEntries(name string) (err error) {
-	zipFileEntries, err := fileList(name)
+	zipFileEntries, err := zipFileList(name)
 	if err != nil {
 		return
 	}
@@ -241,8 +238,8 @@ func printEntries(name string) (err error) {
 	return
 }
 
-// fileList get list of files in zipfile
-func fileList(name string) (entries []zipFileEntry, err error) {
+// zipFileList get list of files in zipfile
+func zipFileList(name string) (entries []zipFileEntry, err error) {
 	zf, err := zip.OpenReader(name)
 	if err != nil {
 		return
@@ -287,11 +284,6 @@ func archiveFiles(zipFileName string, fileEntries []fileEntry) (err error) {
 
 	defer archive.Close()
 
-	var zipFileEntries []zipFileEntry
-	if exists {
-		zipFileEntries, err = fileList(zipFileName)
-	}
-
 	zipWriter := zip.NewWriter(archive)
 	defer zipWriter.Close()
 
@@ -312,45 +304,56 @@ func archiveFiles(zipFileName string, fileEntries []fileEntry) (err error) {
 			return err
 		}
 
-		hasEntry, entry := hasZipFileEntry(fileEntry.archivePath(), &zipFileEntries)
-		localNewer := entry.timestamp.Unix() < info.ModTime().Unix()
+		// There is something wrong with the logic - nothing gets put in the
+		// archive
+
+		// var zipFileEntries []zipFileEntry
+		// if exists {
+		// 	zipFileEntries, err = zipFileList(zipFileName)
+		// }
+
+		// hasEntry, entry := hasZipFileEntry(fileEntry.archivePath(), &zipFileEntries)
+		// localNewer := entry.timestamp.Unix() < info.ModTime().Unix()
 		// localSame := entry.timestamp.Unix() == info.ModTime().Unix()
 		// args.Add meand add and update
-		if exists {
-			// Update existing entries if newer on the file system and add new files.
-			if args.Update {
-				if hasEntry && localNewer {
-					fmt.Fprintln(os.Stderr, colour(noColour, fmt.Sprintf("updating %s", fileEntry.archivePath())))
-				}
-			}
-			// Update existing entries of an archive if newer on the file
-			// system. Does not add new files to the archive.
-			if args.Freshen {
-				if hasEntry && localNewer {
-					fmt.Fprintln(os.Stderr, colour(noColour, fmt.Sprintf("updating %s", fileEntry.archivePath())))
-				} else if !hasEntry {
-					continue
-				}
-			}
-		} else {
-			// Don't add any new files with freshen
-			if args.Freshen {
-				continue
-			}
-		}
-		if args.Add {
-			fmt.Fprintln(os.Stderr, colour(noColour, fmt.Sprintf("adding %s", fileEntry.archivePath())))
-		}
+		// fmt.Println(args.Add, args.Update, args.Freshen)
+		// if exists {
+		// 	// Update existing entries if newer on the file system and add new files.
+		// 	if args.Update {
+		// 		if hasEntry && localNewer {
+		// 			fmt.Fprintln(os.Stderr, colour(noColour, fmt.Sprintf("updating %s", fileEntry.archivePath())))
+		// 		}
+		// 	}
+		// 	// Update existing entries of an archive if newer on the file
+		// 	// system. Does not add new files to the archive.
+		// 	if args.Freshen {
+		// 		if hasEntry && localNewer {
+		// 			fmt.Fprintln(os.Stderr, colour(noColour, fmt.Sprintf("updating %s", fileEntry.archivePath())))
+		// 		} else if !hasEntry {
+		// 			continue
+		// 		}
+		// 	}
+		// } else {
+		// 	// Don't add any new files with freshen
+		// 	if args.Freshen {
+		// 		continue
+		// 	}
+		// }
+		// if args.Add {
+		// 	fmt.Fprintln(os.Stderr, colour(noColour, fmt.Sprintf("adding %s", fileEntry.archivePath())))
+		// }
 
 		// Using header method allows file data to be put in zip file for each
 		// entry. Can also just add the files and paths but then no metadata
 		header, _ := zip.FileInfoHeader(info)
-		header.Method = compressionLevel
+		// fmt.Println("compression level", compressionLevel)
+		header.Method = zip.Deflate
+		// header.store
 		header.Name = fileEntry.archivePath()
 
 		zf, err := zipWriter.CreateHeader(header)
 		if err != nil {
-			fmt.Println(err)
+			fmt.Println("err", err)
 			return err
 		}
 
@@ -369,16 +372,16 @@ func archiveFiles(zipFileName string, fileEntries []fileEntry) (err error) {
 
 var args struct {
 	// File             string   `arg:"-required" help:"zipfile to make or use"`
-	List             bool     `arg:"-l" help:"list entries in zip file"`
-	Add              bool     `arg:"-a" help:"add and update"`
-	Update           bool     `arg:"-u" help:"update if newer and add new"`
-	Freshen          bool     `arg:"-f" help:"freshen newer only"`
-	CompressionLevel uint16   `arg:"-L" derault:"6" help:"compression level (0-9) - defaults to 6" placeholder:"6"`
-	Zipfile          string   `arg:"positional,required" placeholder:"zipfile"`
-	SourceFiles      []string `arg:"positional" placeholder:"file"`
+	List    bool `arg:"-l" help:"list entries in zip file"`
+	Add     bool `arg:"-a" help:"add and update"`
+	Update  bool `arg:"-u" help:"update if newer and add new"`
+	Freshen bool `arg:"-f" help:"freshen newer only"`
+	// CompressionLevel uint16   `arg:"-L" derault:"6" help:"compression level (0-9) - defaults to 6" placeholder:"6"`
+	Zipfile     string   `arg:"positional,required" placeholder:"zipfile"`
+	SourceFiles []string `arg:"positional" placeholder:"file"`
 }
 
-var compressionLevel uint16 = 6 // default compression level for zip
+// var compressionLevel uint16 = 6 // default compression level for zip
 
 func main() {
 	// args.CompressionLevel = 6
@@ -393,10 +396,10 @@ func main() {
 	}
 
 	// less than 0 would probably thrown an error
-	if args.CompressionLevel < 0 || args.CompressionLevel > 9 {
-		args.CompressionLevel = 6
-		compressionLevel = args.CompressionLevel
-	}
+	// if args.CompressionLevel < 0 || args.CompressionLevel > 9 {
+	// 	args.CompressionLevel = 6
+	// 	compressionLevel = args.CompressionLevel
+	// }
 
 	if args.List {
 		err := printEntries(args.Zipfile)
@@ -412,6 +415,7 @@ func main() {
 
 	// Populate list of files
 	for _, path := range args.SourceFiles {
+		// fmt.Println(args.SourceFiles)
 		walkAllFilesInDir(path, &fileEntries, &errorMsgs)
 	}
 	if len(fileEntries) == 0 {
@@ -420,14 +424,9 @@ func main() {
 	}
 
 	// Show what has been found
-	for _, fileEntry := range fileEntries {
-		fmt.Printf("Entry %+v", fileEntry)
-	}
-
-	// Exit for now
-	if 1 == 1 {
-		os.Exit(0)
-	}
+	// for _, fileEntry := range fileEntries {
+	// 	fmt.Printf("Entry %+v\n", fileEntry)
+	// }
 
 	var archiveFile *os.File
 	archiveFile, _, err := getFileForWriting(args.Zipfile)
