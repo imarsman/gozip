@@ -346,7 +346,6 @@ func archiveFiles(zipFileName string, fileEntries []fileEntry) (err error) {
 		// Using header method allows file data to be put in zip file for each
 		// entry. Can also just add the files and paths but then no metadata
 		header, _ := zip.FileInfoHeader(info)
-		// fmt.Println("compression level", compressionLevel)
 		header.Method = zip.Deflate
 		// header.store
 		header.Name = fileEntry.archivePath()
@@ -376,15 +375,13 @@ var args struct {
 	Add     bool `arg:"-a" help:"add and update"`
 	Update  bool `arg:"-u" help:"update if newer and add new"`
 	Freshen bool `arg:"-f" help:"freshen newer only"`
+	// Not currently supported in Go library
 	// CompressionLevel uint16   `arg:"-L" derault:"6" help:"compression level (0-9) - defaults to 6" placeholder:"6"`
 	Zipfile     string   `arg:"positional,required" placeholder:"zipfile"`
 	SourceFiles []string `arg:"positional" placeholder:"file"`
 }
 
-// var compressionLevel uint16 = 6 // default compression level for zip
-
 func main() {
-	// args.CompressionLevel = 6
 	p := arg.MustParse(&args)
 
 	if !args.Add && !args.Update && !args.Freshen {
@@ -394,12 +391,6 @@ func main() {
 	if len(args.SourceFiles) == 0 && !args.List {
 		p.Fail(colour(brightRed, "source files required with no -l parameter"))
 	}
-
-	// less than 0 would probably thrown an error
-	// if args.CompressionLevel < 0 || args.CompressionLevel > 9 {
-	// 	args.CompressionLevel = 6
-	// 	compressionLevel = args.CompressionLevel
-	// }
 
 	if args.List {
 		err := printEntries(args.Zipfile)
