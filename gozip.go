@@ -373,15 +373,15 @@ var args struct {
 	Add              bool     `arg:"-a" help:"add and update"`
 	Update           bool     `arg:"-u" help:"update if newer and add new"`
 	Freshen          bool     `arg:"-f" help:"freshen newer only"`
-	CompressionLevel uint16   `arg:"-L" help:"compression level (0-9) - defaults to 6"`
-	Zipfile          string   `arg:"positional,required"`
-	SourceFiles      []string `arg:"positional"`
+	CompressionLevel uint16   `arg:"-L" derault:"6" help:"compression level (0-9) - defaults to 6" placeholder:"6"`
+	Zipfile          string   `arg:"positional,required" placeholder:"zipfile"`
+	SourceFiles      []string `arg:"positional" placeholder:"file"`
 }
 
-var compressionLevel uint16 = 8 // default compression level for zip
+var compressionLevel uint16 = 6 // default compression level for zip
 
 func main() {
-	args.CompressionLevel = 6
+	// args.CompressionLevel = 6
 	p := arg.MustParse(&args)
 
 	if !args.Add && !args.Update && !args.Freshen {
