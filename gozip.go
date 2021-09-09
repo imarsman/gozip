@@ -268,49 +268,31 @@ func zipFileList(name string) (entries []zipFileEntry, err error) {
 }
 
 // archiveFiles make a zip archive and fill with information from list of fileEntries
-func archiveFiles(zipFileName string, fileEntries []fileEntry) (err error) {
-	var archive *os.File
-	var exists bool
+func archiveFiles(zipFilePath string, fileEntries []fileEntry) (err error) {
 
-	archive, exists, err = getFileForWriting(zipFileName)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, colour(brightRed, err.Error()))
-		return
-	}
-
-	// This will end up opening the file more than once, which is not good
-	var zipFileEntries []zipFileEntry
-	if exists {
-		fmt.Println("exists", exists)
-		archive.Close()
-		zipFileEntries, err = zipFileList(zipFileName)
-	}
-	archive, exists, err = getFileForWriting(zipFileName)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, colour(brightRed, err.Error()))
-		return
-	}
-
-	// Warn about creating new archive if -u was used and the file doesn't exist
-	if !exists {
-		if args.Update {
-			if !args.Quiet {
-				fmt.Fprintln(os.Stderr, colour(brightRed, "creating new archive"))
-			}
+	// Create empty zip file if it doesn't exist
+	if _, err = os.Stat(zipFilePath); os.IsNotExist(err) {
+		createEmptyZip(args.Zipfile)
+		if args.Freshen {
+			fmt.Fprintln(os.Stderr, colour(brightRed, "file does not exist and -f is specified"))
+			return
 		}
 	}
 
-	defer archive.Close()
+	var archive *os.File
 
-	zipWriter := zip.NewWriter(archive)
-	defer zipWriter.Close()
+	var exists bool = true
 
-	var changed bool
+	// This will end up opening the file more than once, which is not good
+	var zipFileEntries = make([]zipFileEntry, 0, 0)
+	if exists {
+		zipFileEntries, err = zipFileList(zipFilePath)
+	}
 
-	fmt.Println(len(zipFileEntries))
+	var goodFileEntries = make([]fileEntry, 0, len(fileEntries))
 
-	// https://github.com/golang/go/issues/18359
 	for _, fileEntry := range fileEntries {
+		// var write = true
 		file, err := os.Open(fileEntry.fullPath())
 		if err != nil {
 			fmt.Fprintln(os.Stderr, colour(brightRed, err.Error()))
@@ -318,7 +300,7 @@ func archiveFiles(zipFileName string, fileEntries []fileEntry) (err error) {
 		}
 		defer file.Close()
 
-		body, err := ioutil.ReadAll(file)
+		file.Close()
 
 		info, err := os.Stat(fileEntry.fullPath())
 		if err != nil {
@@ -331,16 +313,16 @@ func archiveFiles(zipFileName string, fileEntries []fileEntry) (err error) {
 
 		hasEntry, entry := hasZipFileEntry(fileEntry.archivePath(), &zipFileEntries)
 		localNewer := entry.timestamp.Unix() < info.ModTime().Unix()
-		// fmt.Println(hasEntry, localNewer, fileEntry.path)
-		// localSame := entry.timestamp.Unix() == info.ModTime().Unix()
 		if exists {
 			if args.Add {
 				if hasEntry {
 					if !args.Quiet {
+						goodFileEntries = append(goodFileEntries, fileEntry)
 						fmt.Fprintln(os.Stdout, colour(noColour, fmt.Sprintf("updating %s", fileEntry.archivePath())))
 					}
 				} else {
 					if !args.Quiet {
+						goodFileEntries = append(goodFileEntries, fileEntry)
 						fmt.Fprintln(os.Stdout, colour(noColour, fmt.Sprintf("adding %s", fileEntry.archivePath())))
 					}
 				}
@@ -349,6 +331,7 @@ func archiveFiles(zipFileName string, fileEntries []fileEntry) (err error) {
 			if args.Update {
 				if hasEntry && localNewer {
 					if !args.Quiet {
+						goodFileEntries = append(goodFileEntries, fileEntry)
 						fmt.Fprintln(os.Stdout, colour(noColour, fmt.Sprintf("updating %s", fileEntry.archivePath())))
 					}
 				}
@@ -359,6 +342,7 @@ func archiveFiles(zipFileName string, fileEntries []fileEntry) (err error) {
 				fmt.Println(hasEntry, localNewer)
 				if hasEntry && localNewer {
 					if !args.Quiet {
+						goodFileEntries = append(goodFileEntries, fileEntry)
 						fmt.Fprintln(os.Stdout, colour(noColour, fmt.Sprintf("freshen %s", fileEntry.archivePath())))
 					}
 				} else if hasEntry {
@@ -368,18 +352,57 @@ func archiveFiles(zipFileName string, fileEntries []fileEntry) (err error) {
 		} else {
 			if args.Add {
 				if !args.Quiet {
+					goodFileEntries = append(goodFileEntries, fileEntry)
 					fmt.Fprintln(os.Stdout, colour(noColour, fmt.Sprintf("adding %s", fileEntry.archivePath())))
 				}
 			}
 			if args.Update {
 				if !args.Quiet {
-					fmt.Fprintln(os.Stdout, colour(noColour, fmt.Sprintf("updating %s", fileEntry.archivePath())))
+					goodFileEntries = append(goodFileEntries, fileEntry)
+					fmt.Fprintln(os.Stdout, colour(noColour, fmt.Sprintf("adding %s", fileEntry.archivePath())))
 				}
 			}
 			// Don't add any new files with freshen
 			if args.Freshen {
-				continue
+
 			}
+		}
+	}
+
+	if len(goodFileEntries) == 0 {
+		fmt.Println("err", err)
+		return
+	}
+
+	archive, err = os.OpenFile(zipFilePath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, colour(brightRed, err.Error()))
+		return
+	}
+
+	defer archive.Close()
+
+	zipWriter := zip.NewWriter(archive)
+	defer zipWriter.Close()
+	var changed bool
+
+	// https://github.com/golang/go/issues/18359
+	for _, fileEntry := range goodFileEntries {
+		// // var write = true
+		file, err := os.Open(fileEntry.fullPath())
+		if err != nil {
+			fmt.Fprintln(os.Stderr, colour(brightRed, err.Error()))
+			continue
+		}
+		defer file.Close()
+
+		body, err := ioutil.ReadAll(file)
+		file.Close()
+
+		info, err := os.Stat(fileEntry.fullPath())
+		if err != nil {
+			fmt.Println(err)
+			return err
 		}
 
 		// Using header method allows file data to be put in zip file for each
@@ -395,17 +418,14 @@ func archiveFiles(zipFileName string, fileEntries []fileEntry) (err error) {
 		}
 
 		if _, err = zf.Write(body); err != nil {
-			fmt.Println(err)
 			return err
 		}
-		zipWriter.Flush()
 		changed = true
 	}
 	if !changed {
 		if !args.Quiet {
 			fmt.Println("no changes made")
 		}
-		// break loop
 	}
 
 	return
@@ -426,6 +446,23 @@ var args struct {
 	// CompressionLevel uint16   `arg:"-L" derault:"6" help:"compression level (0-9) - defaults to 6" placeholder:"6"`
 	Zipfile     string   `arg:"positional,required" placeholder:"zipfile"`
 	SourceFiles []string `arg:"positional" placeholder:"file"`
+}
+
+func createEmptyZip(path string) {
+	filePtr, err := os.Create(path)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	// Create a zip writter object using file pointer
+	zipWriter := zip.NewWriter(filePtr)
+
+	err = zipWriter.Close()
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	filePtr.Close()
 }
 
 func main() {
@@ -460,6 +497,16 @@ func main() {
 	if len(fileEntries) == 0 {
 		fmt.Fprintln(os.Stderr, colour(brightRed, "no valid files found"))
 		os.Exit(1)
+	}
+
+	fmt.Println("looking for file", args.Zipfile)
+	if _, err := os.Stat(args.Zipfile); os.IsNotExist(err) {
+		createEmptyZip(args.Zipfile)
+		if args.Freshen {
+			fmt.Fprintln(os.Stderr, colour(brightRed, "file does not exist and -f is specified - nothing to do"))
+
+			os.Exit(0)
+		}
 	}
 
 	// Show what has been found
