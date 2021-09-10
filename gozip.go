@@ -440,8 +440,9 @@ func main() {
 	args.Quiet = false
 	p := arg.MustParse(&args)
 
+	// default to add
 	if !args.Add && !args.Update && !args.Freshen {
-		args.Freshen = true
+		args.Add = true
 	}
 
 	if len(args.SourceFiles) == 0 && !args.List {

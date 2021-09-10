@@ -10,6 +10,14 @@ explore the protocol, find any issues, and overall learn more about the things
 that are involved, namely i/o and file handling. I also find it generally useful
 to learn how to pay close attention to exactly how things work.
 
+There are a huge number of possible options for the zip utility. I will likely
+not implement most of them. As far as I can tell the Go zip library does not
+work with updating an existing archive. In testing extra bytes ended up being
+added to the archive with each update. For this reason the code first gets an
+inventory of all files in an archive along with things like modified time and
+then uses that to create a new archive after deleting the old one. This is not
+ideal and if possible a switch will be made to updating rather than replacing.
+
 Zip has enough arguments without also trying to implement unzip. I'll save that
 for another project.
 
