@@ -33,6 +33,16 @@ type fileEntry struct {
 	isBareFile bool
 }
 
+// zipFileEntry represents data stored about a file to be zipped
+type zipFileEntry struct {
+	name             string
+	compressedSize   uint64
+	uncompressedSize uint64
+	date             string
+	time             string
+	timestamp        time.Time
+}
+
 // hasFileEntry check for duplicate absolute paths. Files could be put in more than
 // once since zip allows multiple dir/path args.
 func hasFileEntry(check fileEntry, feList *[]fileEntry) (found bool) {
@@ -195,16 +205,6 @@ func getFileForWriting(path string) (file *os.File, exists bool, err error) {
 	return
 }
 
-// zipFileEntry represents data stored about a file to be zipped
-type zipFileEntry struct {
-	name             string
-	compressedSize   uint64
-	uncompressedSize uint64
-	date             string
-	time             string
-	timestamp        time.Time
-}
-
 // printEntries of a zip file
 func printEntries(name string) (err error) {
 	zipFileEntries, err := zipFileList(name)
@@ -244,7 +244,7 @@ func zipFileList(name string) (entries []zipFileEntry, err error) {
 
 	defer zf.Close()
 
-	entries = make([]zipFileEntry, 0, 0)
+	entries = make([]zipFileEntry, 0, 10)
 
 	for _, file := range zf.File {
 		entry := zipFileEntry{}
@@ -255,7 +255,8 @@ func zipFileList(name string) (entries []zipFileEntry, err error) {
 		timeStr := file.Modified.Format("15:04:05")   // get formatted time
 		entry.date = dateStr
 		entry.time = timeStr
-		entry.timestamp = file.Modified
+		// likely already UTC but be sure
+		entry.timestamp = file.Modified.In(time.UTC)
 
 		entries = append(entries, entry)
 	}
@@ -266,19 +267,17 @@ func zipFileList(name string) (entries []zipFileEntry, err error) {
 // archiveFiles make a zip archive and fill with information from list of fileEntries
 func archiveFiles(zipFilePath string, fileEntries []fileEntry) (err error) {
 
-	// Create empty zip file if it doesn't exist
-	if _, err = os.Stat(zipFilePath); os.IsNotExist(err) {
-		createEmptyZip(args.Zipfile)
-		if args.Freshen {
-			fmt.Fprintln(os.Stderr, colour(brightRed, "file does not exist and -f is specified"))
-			return
-		}
-	}
-
 	var exists bool = true
 
-	// This will end up opening the file more than once, which is not good
+	// If there is no zipfile we'll make one later
+	if _, err = os.Stat(zipFilePath); os.IsNotExist(err) {
+		exists = false
+	}
+
+	// create an empty list of zip file entries
 	var zipFileEntries = make([]zipFileEntry, 0, 0)
+
+	// if the file exists get the file list
 	if exists {
 		zipFileEntries, err = zipFileList(zipFilePath)
 	}
@@ -346,6 +345,7 @@ func archiveFiles(zipFilePath string, fileEntries []fileEntry) (err error) {
 	}
 
 	var archive *os.File
+	// createEmptyZip(zipFilePath)
 	// Truncate prior to working with zip file or extra bytes will accumulate
 	archive, err = os.Create(zipFilePath)
 	if err != nil {
@@ -362,21 +362,22 @@ func archiveFiles(zipFilePath string, fileEntries []fileEntry) (err error) {
 
 	// I presume that a nested function will still work with defer
 	var archiveFile = func(fileEntry fileEntry) (err error) {
-		info, err := os.Stat(fileEntry.fullPath())
+		fileInfo, err := os.Stat(fileEntry.fullPath())
 		if err != nil {
 			fmt.Println(err)
 			return err
 		}
 
 		// Should not happen as we ignore dirs when gathering
-		if info.IsDir() {
+		if fileInfo.IsDir() {
 			return
 		}
 
 		// Using header method allows file data to be put in zip file for each
 		// entry. Can also just add the files and paths but then no metadata
-		header, _ := zip.FileInfoHeader(info)
+		header, _ := zip.FileInfoHeader(fileInfo)
 		header.Method = zip.Deflate
+		// Override fileInfo value
 		header.Name = fileEntry.archivePath()
 
 		headerWriter, err := zipWriter.CreateHeader(header)
@@ -423,6 +424,7 @@ func archiveFiles(zipFilePath string, fileEntries []fileEntry) (err error) {
 	writing how much of the original utility will be implemented.
 */
 
+// the parameters used by the app
 var args struct {
 	List    bool `arg:"-l" help:"list entries in zip file" default:"false"`
 	Add     bool `arg:"-a" help:"add and update" default:"false"`
@@ -435,6 +437,8 @@ var args struct {
 	SourceFiles []string `arg:"positional" placeholder:"file"`
 }
 
+// create an empty zip for if one doesn't exist or starting from empty with new
+// file input
 func createEmptyZip(path string) {
 	filePtr, err := os.Create(path)
 	if err != nil {
