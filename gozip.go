@@ -345,7 +345,6 @@ func archiveFiles(zipFilePath string, fileEntries []fileEntry) (err error) {
 	}
 
 	var archive *os.File
-	// createEmptyZip(zipFilePath)
 	// Truncate prior to working with zip file or extra bytes will accumulate
 	archive, err = os.Create(zipFilePath)
 	if err != nil {
@@ -435,25 +434,6 @@ var args struct {
 	// CompressionLevel uint16   `arg:"-L" derault:"6" help:"compression level (0-9) - defaults to 6" placeholder:"6"`
 	Zipfile     string   `arg:"positional,required" placeholder:"zipfile"`
 	SourceFiles []string `arg:"positional" placeholder:"file"`
-}
-
-// create an empty zip for if one doesn't exist or starting from empty with new
-// file input
-func createEmptyZip(path string) {
-	filePtr, err := os.Create(path)
-	if err != nil {
-		fmt.Println(err)
-	}
-
-	// Create a zip writter object using file pointer
-	zipWriter := zip.NewWriter(filePtr)
-
-	err = zipWriter.Close()
-	if err != nil {
-		fmt.Println(err)
-	}
-
-	filePtr.Close()
 }
 
 func main() {
